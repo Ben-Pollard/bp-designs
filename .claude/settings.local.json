@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(poetry --version:*)",
+      "Bash(poetry install:*)",
+      "Bash(poetry run python:*)",
+      "Bash(poetry run pytest:*)",
+      "Bash(poetry run ruff:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
