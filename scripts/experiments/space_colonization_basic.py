@@ -3,7 +3,7 @@
 Explores key parameters: attraction_distance, num_attractions, segment_length.
 """
 
-from bp_designs.experiment import ExperimentRunner, ParameterSpace, generate_gallery
+from bp_designs.experiment import ExperimentRunner, ParameterSpace
 from bp_designs.patterns.branching import SpaceColonization
 
 
@@ -44,9 +44,6 @@ def main():
     )
 
     runner.run(grid=grid, generator_fn=generate_pattern)
-
-    # Generate gallery
-    generate_gallery(runner.exp_dir)
 
 
 if __name__ == "__main__":

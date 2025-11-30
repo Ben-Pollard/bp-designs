@@ -40,3 +40,4 @@ build/
 output/
 
 *.svg
+/gallery/experiments.json
