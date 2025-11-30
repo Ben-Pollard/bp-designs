@@ -30,6 +30,8 @@ build-backend = "poetry.core.masonry.api"
 # Ruff configuration - fast Python linter (replaces flake8, isort, etc.)
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint]
 select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
@@ -39,10 +41,10 @@ select = [
     "C4",  # flake8-comprehensions
     "UP",  # pyupgrade
 ]
-ignore = []
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]  # Allow unused imports in __init__.py
+
 
 [tool.ruff.lint.pydocstyle]
 # Enable docstring checking

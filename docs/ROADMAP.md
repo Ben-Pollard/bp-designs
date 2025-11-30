@@ -103,6 +103,15 @@ This is craft + iteration + constraints, not just coding.
 - **Features:** Failure tracking, variant metadata, responsive gallery display
 - **Ready for:** Systematic parameter exploration and finding "natural" sweet spots
 
+### 2025-01-30: Composition phase planning
+- **Decision:** Move to Phase 2 (composition exploration) before optimizing individual patterns
+- **Rationale:** Core design goal is composability; can't learn composition with one pattern; interaction understanding needed before pattern optimization
+- **Second pattern:** Voronoi tessellation (cellular) chosen over flow fields / reaction-diffusion
+- **Why Voronoi:** Visual contrast with branching, simple implementation, clear composition potential, manufacturing-compatible
+- **Approach:** Start with simple layering (no API changes), explore visual principles, add masking only if needed, design API based on proven needs (no premature abstraction)
+- **Documentation:** Created `COMPOSITION_PLAN.md` with detailed rationale, implementation steps, open questions, and success criteria
+- **README:** Updated for new developer onboarding with concise setup, workflow, design goals, and agent collaboration instructions
+
 ---
 
 ## Open Questions
@@ -112,42 +121,93 @@ This is craft + iteration + constraints, not just coding.
 
 ---
 
+## Phase 2: Composition Exploration (Next)
+
+**Goal:** Understand how patterns interact and compose; learn what API is needed for composition.
+
+**See:** `docs/COMPOSITION_PLAN.md` for detailed plan.
+
+### Why Phase 2 Now?
+- Core design goal is composability ("patterns are building blocks")
+- Can't learn composition principles with one pattern
+- No need to optimize individual patterns yet—need to understand interaction first
+
+### Second Pattern: Voronoi Tessellation
+**Choice:** Voronoi (cellular) over flow fields or reaction-diffusion
+- Visual contrast with branching (cellular vs. linear)
+- Simple to implement, fast iteration
+- Clear composition potential (fill, mask, guide)
+- Manufacturing-compatible
+
+### Step 1: Implement Basic Voronoi
+- [ ] Create `patterns/cellular/voronoi.py`
+- [ ] Parameters: num_sites, relaxation_iterations, render_mode, bounds
+- [ ] Output: Polylines (edges) compatible with existing export
+- [ ] Test determinism
+
+### Step 2: Explore Simple Layering
+- [ ] Create `scripts/experiments/composition_layering.py`
+- [ ] Generate parameter grids:
+  - Branching density × Voronoi density
+  - Different stacking orders
+  - Different line weights
+- [ ] View in gallery, identify what works
+
+### Step 3: Document Composition Principles
+- [ ] What density ratios prevent visual conflict?
+- [ ] Which pattern should dominate when?
+- [ ] How do line weights create hierarchy?
+- [ ] Update `LEARNINGS.md` with findings
+
+### Step 4: Explore Masking (If Needed)
+- [ ] If layering isn't sufficient, implement spatial masking
+- [ ] Experiment: branches only grow in selected Voronoi cells
+- [ ] Document API requirements for masking
+
+### Step 5: Design Composition API
+- [ ] Based on experiments, determine what API is needed
+- [ ] Start simple (functional composition over complex classes)
+- [ ] Only build what's proven necessary
+- [ ] Create composition presets (proven combinations)
+
+### Success Criteria
+- 5-10 proven composition examples
+- Documented principles (density ratios, hierarchy, spacing)
+- Clear understanding of required API (no premature abstraction)
+- Compositions meet manufacturing constraints
+
+---
+
 ## Future Phases (Outline)
 
-### Experimentation Tooling
-- [x] Gallery viewer (HTML with grid layout)
-- [x] Save outputs with metadata (JSON + SVG)
-- [x] Organization of experiment code (scripts/experiments/)
-- [x] Parameter space definition for multi-generation (ParameterSpace + ParameterGrid)
-- [ ] Interactive experiment GUI (future enhancement)
-- [ ] Gallery filtering/sorting (future enhancement)
-- [ ] Export metadata for compositional analysis
+### Phase 3: Pattern Refinement
+After understanding composition, return to optimize individual patterns:
+- Add natural constraints (tapering, collision avoidance, boundary awareness)
+- Find parameter "sweet spots" through systematic exploration
+- Build preset library of proven configurations
+- Validate against leather constraints
 
-### Second Pattern Family
-- Flow fields or reaction-diffusion
-- Apply learnings from Phase 1
-- Build composition examples
+### Phase 4: Composition Tooling
+- Implement composition API based on Phase 2 learnings
+- Templates for common layouts (border, corner, center)
+- Advanced masking and mutual influence
+- High-level composition functions
 
-### API Composition
-- Work out how to combine patterns
-- Simple chaining, like image processor workflow, or metadata/composition aware?
-- What changes to the API would be needed?
+### Phase 5: Additional Pattern Families
+- Flow fields (directional texture)
+- Reaction-diffusion (organic fill)
+- Parametric curves (geometric motifs)
+- Apply composition principles from Phase 2
 
-### Image Composition Patterns
-- Study how branching + texture combine in nature
-- Implement composition templates (border, corner, center)
-- Test layering and masking
-- Create high-level composition API
-
-### Library of "Moves"
+### Phase 6: Library of "Moves"
 - Document vocabulary of proven patterns
-- Build example gallery
+- Catalog composition recipes
+- Build curated example gallery
+- Create pattern/composition presets
 
-### Advanced Knowledge Management
-Exploration of:
-- Local Graph RAG system
-- Small local LLM for embeddings
-- MS GraphRAG library
-- Knowledge graph front-end
+### Future: Advanced Tooling
+- Interactive parameter editor in gallery
+- Real-time preview
+- Advanced knowledge management (graph RAG, embeddings)
 
 ---
