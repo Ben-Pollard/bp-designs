@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Callable
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -25,7 +26,7 @@ class ExperimentRunner:
     def __init__(
         self,
         experiment_name: str,
-        output_dir: str | Path = "experiments",
+        output_dir: str | Path = "output/experiments",
         svg_width: float = 100,
         svg_height: float = 100,
         stroke_width: float = 0.3,
@@ -129,6 +130,7 @@ class ExperimentRunner:
             "failed": len(failures),
             "failures": failures,
             "elapsed_seconds": elapsed,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "svg_config": {
                 "width": self.svg_width,
                 "height": self.svg_height,
@@ -139,6 +141,9 @@ class ExperimentRunner:
         config_path = self.exp_dir / "config.json"
         config_path.write_text(json.dumps(experiment_summary, indent=2))
 
+        # Update experiments index for gallery
+        self._update_experiments_index(experiment_summary)
+
         print(f"\n{'=' * 60}")
         print(f"Complete: {successes} successful, {len(failures)} failed")
         print(f"Time: {elapsed:.1f}s ({elapsed / num_variants:.2f}s per variant)")
@@ -146,3 +151,53 @@ class ExperimentRunner:
         print(f"{'=' * 60}\n")
 
         return experiment_summary
+
+    def _update_experiments_index(self, experiment_summary: dict[str, Any]) -> None:
+        """Update central experiments index for gallery discovery.
+
+        Args:
+            experiment_summary: Summary data from completed experiment
+        """
+        # Write to gallery/experiments.json for easy manual editing
+        index_path = Path("gallery/experiments.json")
+        index_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Load existing index
+        if index_path.exists():
+            try:
+                with open(index_path) as f:
+                    index = json.load(f)
+            except json.JSONDecodeError:
+                index = []
+        else:
+            index = []
+
+        # Create entry for this experiment
+        entry = {
+            "name": self.experiment_name,
+            "display_name": experiment_summary.get("experiment_name", self.experiment_name),
+            "parameter_space": experiment_summary.get("parameter_space"),
+            "total_variants": experiment_summary.get("total_variants", 0),
+            "successful": experiment_summary.get("successful", 0),
+            "failed": experiment_summary.get("failed", 0),
+            "timestamp": experiment_summary.get("timestamp"),
+        }
+
+        # Update or append entry
+        existing_idx = None
+        for i, exp in enumerate(index):
+            if exp["name"] == self.experiment_name:
+                existing_idx = i
+                break
+
+        if existing_idx is not None:
+            index[existing_idx] = entry
+        else:
+            index.append(entry)
+
+        # Sort by timestamp (most recent first)
+        index.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+
+        # Write updated index
+        index_path.write_text(json.dumps(index, indent=2))
+        print(f"Updated experiments list: {index_path}")

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BP Designs - Experiment Gallery</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <h1>BP Designs Experiment Gallery</h1>
+            <p class="subtitle">Algorithmic Pattern Exploration</p>
+        </div>
+    </header>
+
+    <main class="main">
+        <!-- Experiment Selection -->
+        <section class="controls">
+            <div class="control-group">
+                <label for="experiment-select">Select Experiment:</label>
+                <select id="experiment-select" disabled>
+                    <option>Loading experiments...</option>
+                </select>
+            </div>
+            <button id="refresh-btn" class="btn-refresh" title="Refresh experiment list">
+                ↻ Refresh
+            </button>
+        </section>
+
+        <!-- Experiment Info -->
+        <section id="experiment-info" class="experiment-info hidden">
+            <h2 id="experiment-title"></h2>
+            <div class="experiment-meta">
+                <div class="meta-item">
+                    <span class="meta-label">Pattern Type:</span>
+                    <span id="pattern-type" class="meta-value">—</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">Variants:</span>
+                    <span id="total-variants" class="meta-value">—</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">Successful:</span>
+                    <span id="successful-variants" class="meta-value">—</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">Failed:</span>
+                    <span id="failed-variants" class="meta-value">—</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">Date:</span>
+                    <span id="experiment-date" class="meta-value">—</span>
+                </div>
+            </div>
+            <div id="experiment-description" class="experiment-description"></div>
+        </section>
+
+        <!-- Variants Grid -->
+        <section id="variants-section" class="variants-section hidden">
+            <h3>Variants</h3>
+            <div id="variants-grid" class="variants-grid">
+                <!-- Variant cards will be inserted here by JS -->
+            </div>
+        </section>
+
+        <!-- Empty State -->
+        <section id="empty-state" class="empty-state">
+            <div class="empty-state-content">
+                <p class="empty-state-icon">📊</p>
+                <h3>No Experiments Found</h3>
+                <p>Run an experiment script to generate data:</p>
+                <pre><code>poetry run python scripts/experiments/space_colonization_basic.py</code></pre>
+                <p class="empty-state-hint">Experiments will appear in <code>output/experiments/</code></p>
+            </div>
+        </section>
+
+        <!-- Error State -->
+        <section id="error-state" class="error-state hidden">
+            <div class="error-content">
+                <p class="error-icon">⚠️</p>
+                <h3>Error Loading Gallery</h3>
+                <p id="error-message"></p>
+                <p class="error-hint">
+                    If running locally, start a local server:
+                    <pre><code>python -m http.server 8000</code></pre>
+                    Then open: <code>http://localhost:8000/gallery/</code>
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>BP Designs Experimentation Framework</p>
+    </footer>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>

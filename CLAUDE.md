@@ -45,6 +45,7 @@ Minimize token usage by reading only what's relevant. Maintain enough context to
 | `docs/resources/algorithms.md` | Choosing approach | Quick algorithm overviews |
 | `docs/resources/RESOURCES.md` | Need citations/examples | External papers, examples, tools |
 | `docs/api.md` | Writing pattern code | Pattern generator API reference |
+| `docs/ARCHITECTURE_GALLERY.md` | Working on experiments/gallery | Gallery system architecture, data schemas |
 
 ### Documentation During Work
 
@@ -138,9 +139,40 @@ poetry run python -c "..." # Quick test imports/code
 ### Jupyter-First Exploration
 1. Work interactively in notebooks
 2. Generate variations quickly
-3. Use Gallery tool to batch-render HTML comparisons
+3. Run systematic experiments (see Experimentation Workflow below)
 4. Iterate on parameters based on visual results
 5. Graduate working code to modules
+
+### Experimentation Workflow
+
+**Running Experiments:**
+1. Create experiment script in `scripts/experiments/` (or use existing)
+2. Define parameter space using `ParameterSpace`
+3. Run with `ExperimentRunner` → outputs to `output/experiments/[name]/`
+4. Runner automatically updates `output/experiments/index.json`
+
+**Viewing Results:**
+1. Open `gallery/index.html` in browser (or via `python -m http.server 8000`)
+2. Click refresh if needed (gallery auto-discovers experiments from index.json)
+3. Select experiment from dropdown
+4. Compare variants visually
+5. Document findings in `docs/exploration/[date]_[topic].md`
+
+**Example:**
+```bash
+# Run experiment
+poetry run python scripts/experiments/space_colonization_basic.py
+
+# View in gallery (outputs appear automatically)
+open gallery/index.html
+# OR: python -m http.server 8000, then open http://localhost:8000/gallery/
+```
+
+**Key Points:**
+- Experiments are self-contained in `output/experiments/[name]/`
+- Gallery is data-driven (no manual path updates needed)
+- Index is auto-updated by `ExperimentRunner`
+- See `docs/ARCHITECTURE_GALLERY.md` for technical details
 
 ### Pattern Implementation Cycle
 1. Research algorithm (check `algorithms.md`, `RESOURCES.md`)
