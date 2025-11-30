@@ -2,7 +2,7 @@
 
 ## Current Phase: Phase 1 - Deep Exploration of Branching Patterns
 
-**Status:** Planning
+**Status:** Core Implementation Complete - Ready for Exploration
 **Started:** 2025-01-23
 **Goal:** Implement one pattern generator deeply, explore parameter space, learn what "natural" means in practice
 
@@ -35,9 +35,10 @@ This is craft + iteration + constraints, not just coding.
 - L-systems: More control, easier parameterization
 
 ### Step 2: Core Implementation
-- [ ] Implement base algorithm with extensive parameters
-- [ ] Build parameter explorer (generate grids of variations)
-- [ ] Add basic SVG export for visual review
+- [x] Implement base algorithm with extensive parameters
+- [x] Add basic SVG export for visual review
+- [x] Create Jupyter notebook for interactive exploration
+- [x] Build parameter explorer (generate grids of variations)
 - [ ] Create test suite for determinism
 
 ### Step 3: Add Natural Constraints
@@ -85,6 +86,23 @@ This is craft + iteration + constraints, not just coding.
 - **Token savings:** ~70% reduction in routine context (from ~5300 to ~1600 tokens per session)
 - **Principle:** Dashboard → Details (read only what's needed)
 
+### 2025-01-29: Branch continuity fix
+- **Issue:** `BranchNetwork.to_geometry()` was creating discontinuous branches - shared trunk segments only belonged to first branch, creating visual gaps
+- **Fix:** Changed geometry extraction to trace complete paths from each leaf to root, allowing nodes to appear in multiple branch polylines
+- **Result:** Branches now render as continuous lines from root to leaves
+- **Side effect:** Trunk segments are drawn multiple times (once per branch), creating natural line weight variation - keeping this as a feature option
+
+### 2025-01-29: Experimentation framework complete
+- **Components:**
+  - `ParameterSpace` - Define parameter ranges (explicit lists or linear ranges)
+  - `ParameterGrid` - Generate all combinations via cartesian product
+  - `ExperimentRunner` - Execute experiments, save SVGs + metadata
+  - `generate_gallery()` - Create interactive HTML gallery with parameter display
+- **Workflow:** Script-based (not Jupyter) - define params → run → view gallery
+- **Output:** `experiments/{name}/outputs/` (SVGs + JSON), `gallery.html`, `config.json`
+- **Features:** Failure tracking, variant metadata, responsive gallery display
+- **Ready for:** Systematic parameter exploration and finding "natural" sweet spots
+
 ---
 
 ## Open Questions
@@ -96,23 +114,36 @@ This is craft + iteration + constraints, not just coding.
 
 ## Future Phases (Outline)
 
-### Composition Patterns
-- Study how branching + texture combine in nature
-- Implement composition templates (border, corner, center)
-- Test layering and masking
+### Experimentation Tooling
+- [x] Gallery viewer (HTML with grid layout)
+- [x] Save outputs with metadata (JSON + SVG)
+- [x] Organization of experiment code (scripts/experiments/)
+- [x] Parameter space definition for multi-generation (ParameterSpace + ParameterGrid)
+- [ ] Interactive experiment GUI (future enhancement)
+- [ ] Gallery filtering/sorting (future enhancement)
+- [ ] Export metadata for compositional analysis
 
 ### Second Pattern Family
 - Flow fields or reaction-diffusion
 - Apply learnings from Phase 1
 - Build composition examples
 
+### API Composition
+- Work out how to combine patterns
+- Simple chaining, like image processor workflow, or metadata/composition aware?
+- What changes to the API would be needed?
+
+### Image Composition Patterns
+- Study how branching + texture combine in nature
+- Implement composition templates (border, corner, center)
+- Test layering and masking
+- Create high-level composition API
+
 ### Library of "Moves"
 - Document vocabulary of proven patterns
-- Create high-level composition API
 - Build example gallery
 
 ### Advanced Knowledge Management
-
 Exploration of:
 - Local Graph RAG system
 - Small local LLM for embeddings

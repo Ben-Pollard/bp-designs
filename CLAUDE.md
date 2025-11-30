@@ -17,7 +17,7 @@ At the start of each session or when resuming work:
 1. **Always read:** `docs/ROADMAP.md` to understand current phase, priorities, and recent decisions
 
 2. **Check for new exploration files:**
-   - List `exploration/*.md` files
+   - List `docs/exploration/*.md` files
    - Read any files from today's date
    - Skim recent dated files if relevant to current work
 
@@ -49,7 +49,7 @@ Minimize token usage by reading only what's relevant. Maintain enough context to
 ### Documentation During Work
 
 **During exploration:**
-- Record detailed findings in `exploration/[date]_[topic].md`
+- Record detailed findings in `docs/exploration/[date]_[topic].md`
 - Include: parameters tested, visual observations, failed attempts, insights
 
 **After experiments:**

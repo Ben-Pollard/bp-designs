@@ -105,13 +105,28 @@ class BranchNetwork:
     def to_geometry(self) -> Geometry:
         """Convert to polyline representation for export.
 
-        Extracts each branch as a separate polyline.
+        Extracts each branch as a complete path from leaf to root.
+        Nodes can appear in multiple branches (shared trunk segments).
 
         Returns:
             List of polylines (each is Mx2 array)
         """
-        unique_branches = np.unique(self.branch_ids)
-        return [self.get_branch(bid) for bid in unique_branches if bid >= 0]
+        leaves = self.get_leaves()
+        branches = []
+
+        for leaf_idx in leaves:
+            # Trace from leaf to root
+            path = []
+            current = leaf_idx
+            while current != -1:
+                path.append(self.positions[current])
+                current = self.parents[current]
+
+            if len(path) >= 2:
+                # Reverse to get root → leaf order
+                branches.append(np.array(path[::-1]))
+
+        return branches
 
     @classmethod
     def from_node_list(cls, nodes: list[dict], compute_branches: bool = True) -> BranchNetwork:

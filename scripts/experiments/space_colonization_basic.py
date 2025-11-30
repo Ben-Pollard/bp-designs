@@ -1,0 +1,53 @@
+"""Basic space colonization parameter exploration.
+
+Explores key parameters: attraction_distance, num_attractions, segment_length.
+"""
+
+from bp_designs.experiment import ExperimentRunner, ParameterSpace, generate_gallery
+from bp_designs.patterns.branching import SpaceColonization
+
+
+def generate_pattern(params: dict):
+    """Generate pattern from parameters."""
+    gen = SpaceColonization(**params)
+    return gen.generate()
+
+
+def main():
+    """Run basic space colonization exploration."""
+    # Define parameter space
+    space = ParameterSpace(
+        name="space_colonization_basic",
+        ranges={
+            "attraction_distance": [30.0, 50.0, 70.0],  # 3 values
+            "num_attractions": [200, 500, 1000],  # 3 values
+            "segment_length": [1.0, 2.0, 4.0],  # 3 values
+        },
+        fixed={
+            "seed": 42,  # Same seed for fair comparison
+            "kill_distance": 5.0,
+            "width": 100.0,
+            "height": 100.0,
+        },
+    )
+
+    # Generate grid
+    grid = space.to_grid()
+    print(f"Total combinations: {len(grid)}")  # 3 × 3 × 3 = 27
+
+    # Run experiment
+    runner = ExperimentRunner(
+        experiment_name="space_col_basic_001",
+        svg_width=100,
+        svg_height=100,
+        stroke_width=0.3,
+    )
+
+    runner.run(grid=grid, generator_fn=generate_pattern)
+
+    # Generate gallery
+    generate_gallery(runner.exp_dir)
+
+
+if __name__ == "__main__":
+    main()
