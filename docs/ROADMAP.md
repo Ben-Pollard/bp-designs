@@ -1,170 +1,227 @@
-# BP Designs - Development Roadmap
+# Development Roadmap
 
-## Current Phase: Phase 1 - Deep Exploration of Branching Patterns
+## Current Status: System Broken After Refactor
 
-**Status:** Core Implementation Complete - Ready for Exploration
-**Started:** 2025-01-23
-**Goal:** Implement one pattern generator deeply, explore parameter space, learn what "natural" means in practice
-
----
-
-## Why Start Here
-
-Natural beauty comes from **constrained emergence**, not random algorithm chaining. We need to:
-1. Deeply explore one algorithm's parameter space
-2. Find "sweet spots" that feel natural
-3. Build constraint systems (tapering, collision avoidance, boundary awareness)
-4. Document what works and why
-5. Establish patterns for future generators
-
-This is craft + iteration + constraints, not just coding.
+**Date:** 2025-01-30
+**Situation:** Added new ABCs (Pattern, Generator) and rearranged folders. Tests failing, gallery not generating.
+**Goal:** Get system working again - tests passing, gallery samples generating.
 
 ---
 
-## Phase 1 Detailed Plan
+## Immediate Priority: Restore Working System
 
-### Step 1: Choose First Pattern Family
-**Decision:** Start with **branching patterns**
+**See:** `docs/features/composition_spec.md` for architecture details.
 
-### Step 2: Core Implementation
-- [ ] Create test suite for determinism
+### What's Been Done (Phase 2 Implementation)
+- ✅ Core ABCs defined: `Pattern`, `Generator`, `CompositePattern`
+- ✅ `BranchNetwork` refactored to implement `Pattern` interface
+- ✅ `SpaceColonization` updated to accept guidance fields
+- ✅ `PatternCombinator.guide()` and `PatternCombinator.texture()` implemented
+- ✅ Field interface working (distance, depth, density, direction channels)
 
-### Step 3: Add Natural Constraints
-- [ ] Stroke tapering (thick → thin based on hierarchy)
-- [ ] Collision avoidance (branches don't cross)
-- [ ] Boundary awareness (growth stops at edges)
-- [ ] Optional: Tropism (growth bias toward direction)
-- [ ] Optional: "Almost symmetry" perturbation
+### What's Broken Now
+After folder reorganization and ABC additions:
+- [ ] Tests failing (need to update imports, paths)
+- [ ] Gallery samples not generating
+- [ ] May have broken existing `VoronoiTessellation` implementation
 
-### Step 4: Parameter Exploration & Documentation
-- [x] Generate 50-100 variations systematically
-- [ ] Identify 5-10 "natural-looking" configurations
-- [ ] Document parameter ranges that work
-- [ ] Record insights in EXPLORATION_LOG.md
-- [ ] Create preset library of known-good configs
+### Step-by-Step Recovery Plan
 
-### Step 5: Validate Against Physical Constraints
-- [ ] Verify minimum line thickness
-- [ ] Verify minimum spacing
-- [ ] Check that patterns can emboss at shallow relief
-- [ ] Ensure adequate negative space
+#### 1. Fix Core Imports & Structure (First Priority)
+- [ ] Update all imports to reflect new folder structure
+- [ ] Ensure `src/core/pattern.py` is importable
+- [ ] Ensure `src/core/combinator.py` is importable
+- [ ] Fix any circular import issues
+- [ ] Verify `__init__.py` files are correct
+
+#### 2. Get Basic Tests Passing
+- [ ] Run test suite: `pytest tests/`
+- [ ] Fix failing tests one module at a time:
+  - [ ] Core pattern interface tests
+  - [ ] BranchNetwork tests (field queries, geometry)
+  - [ ] SpaceColonization tests (generation, determinism)
+  - [ ] VoronoiTessellation tests (if they exist)
+- [ ] Ensure determinism tests pass (same seed → same output)
+
+#### 3. Validate Basic Pattern Generation
+Create simple smoke test script:
+```python
+# scripts/smoke_test.py
+from src.generators.branching.space_colonization import SpaceColonization
+
+# Can we generate a basic tree?
+gen = SpaceColonization(bounds=(0, 0, 100, 100), n_attractions=100, seed=42)
+tree = gen.generate_pattern()
+print(f"Generated tree with {len(tree.positions)} nodes")
+
+# Can we query it as a field?
+import numpy as np
+points = np.array([[50, 50]])
+distance = tree.sample_field(points, 'distance')
+print(f"Distance at (50,50): {distance}")
+
+# Can we render it?
+geometry = tree.to_geometry()
+print(f"Geometry has {len(geometry)} polylines")
+```
+- [ ] Run smoke test
+- [ ] Fix any runtime errors
+
+#### 4. Fix VoronoiTessellation Integration
+- [ ] Check if `VoronoiTessellation` still works after refactor
+- [ ] If broken, update to implement `Pattern` interface:
+  - [ ] Add `sample_field()` method with channels
+  - [ ] Add `available_channels()` method
+  - [ ] Ensure `to_geometry()` still works
+  - [ ] Add `bounds()` method
+- [ ] Test Voronoi generation independently
+
+#### 5. Validate Composition System
+- [ ] Test `PatternCombinator.guide()`:
+  ```python
+  voronoi = VoronoiTessellation(...).generate_pattern()
+  tree_gen = SpaceColonization(...)
+  guided = PatternCombinator.guide(voronoi, tree_gen, 'boundary_distance')
+  ```
+- [ ] Test `PatternCombinator.texture()`:
+  ```python
+  tree = tree_gen.generate_pattern()
+  textured = PatternCombinator.texture(tree, voronoi, threshold=5.0)
+  geometry = textured.to_geometry()
+  ```
+- [ ] Verify results are deterministic
+
+#### 6. Restore Gallery Generation
+- [ ] Create simple gallery generation script:
+  ```python
+  # scripts/generate_basic_gallery.py
+  # Generate 5-10 basic tree + voronoi combinations
+  # Save as SVG files
+  # Generate gallery HTML
+  ```
+- [ ] Run gallery generation
+- [ ] Visually inspect outputs
+- [ ] Ensure gallery displays correctly
+
+#### 7. Document Current State
+- [ ] Update `LEARNINGS.md` with any findings
+- [ ] Note what works, what doesn't
+- [ ] Document any architectural changes needed
+- [ ] Mark this checkpoint in roadmap
+
+---
+
+## Success Criteria for Recovery
+
+System is "working again" when:
+- ✅ Test suite passes (`pytest tests/`)
+- ✅ Smoke test runs without errors
+- ✅ Can generate basic tree pattern
+- ✅ Can generate basic Voronoi pattern
+- ✅ Can combine patterns via `PatternCombinator.guide()`
+- ✅ Gallery generates and displays 5+ example combinations
+- ✅ All outputs are deterministic (same seed → same result)
+
+---
+
+## Next Steps After Recovery
+
+Once system is working:
+
+### Phase 2 Completion: Exploration & Documentation
+- [ ] Generate systematic variations:
+  - Guided growth (different influence strengths)
+  - Textured patterns (different thresholds)
+  - Parameter sweeps
+- [ ] Use Gallery tool to batch render variations
+- [ ] Identify 5-10 "natural-looking" compositions
+- [ ] Document findings in `exploration/2025-01-30_tree_voronoi_composition.md`
+- [ ] Update `LEARNINGS.md` with composition principles
+
+### Missing Combinators (Optional)
+- [ ] Implement `PatternCombinator.nest()` if needed for exploration
+- [ ] Implement `PatternCombinator.blend()` if needed for exploration
 
 ---
 
 ## Decisions Log
 
-### 2025-01-29: Branch continuity fix
-- **Issue:** `BranchNetwork.to_geometry()` was creating discontinuous branches - shared trunk segments only belonged to first branch, creating visual gaps
-- **Fix:** Changed geometry extraction to trace complete paths from each leaf to root, allowing nodes to appear in multiple branch polylines
-- **Result:** Branches now render as continuous lines from root to leaves
-- **Side effect:** Trunk segments are drawn multiple times (once per branch), creating natural line weight variation - keeping this as a feature option
+### 2025-01-30: System refactor complete, now fixing breakage
+- **What happened:** Implemented Phase 2 architecture (ABCs, field interface, combinators)
+- **Current state:** Core implementation done but system broken after folder reorganization
+- **Priority:** Get tests passing and gallery generating before continuing exploration
 
-### 2025-01-29: Experimentation framework complete
-- **Features:** Failure tracking, variant metadata, responsive gallery display
-- **Ready for:** Systematic parameter exploration and finding "natural" sweet spots
+### 2025-01-30: Composition architecture implemented
+- **Core components:**
+  - `Pattern` ABC with field interface
+  - `Generator` ABC with `generate_pattern()` method
+  - `BranchNetwork` implements Pattern with 5 channels
+  - `SpaceColonization` implements Generator with guidance support
+  - `PatternCombinator` with semantic composition operators
+  - `CompositePattern` for recursive composition
+- **Reference:** See `docs/features/composition_spec.md` for full architecture
 
-### 2025-01-30: Composition phase planning
-- **Decision:** Move to Phase 2 (composition exploration) before optimizing individual patterns
-
-
----
-
-## Open Questions
-
-3. How to evaluate "natural" objectively? (User review vs metrics?)
-
----
-
-## Phase 2: Composition Exploration (Next)
-
-**Goal:** Understand how patterns interact and compose; learn what API is needed for composition.
-
-**See:** `docs/COMPOSITION_PLAN.md` for detailed plan.
-
-### Why Phase 2 Now?
-- Core design goal is composability ("patterns are building blocks")
-- Can't learn composition principles with one pattern
-- No need to optimize individual patterns yet—need to understand interaction first
-
-### Second Pattern: Voronoi Tessellation
-**Choice:** Voronoi (cellular) over flow fields or reaction-diffusion
-- Visual contrast with branching (cellular vs. linear)
-- Simple to implement, fast iteration
-- Clear composition potential (fill, mask, guide)
-- Manufacturing-compatible
-
-### Step 1: Implement Basic Voronoi
-- [ ] Create `patterns/cellular/voronoi.py`
-- [ ] Parameters: num_sites, relaxation_iterations, render_mode, bounds
-- [ ] Output: Polylines (edges) compatible with existing export
-- [ ] Test determinism
-
-### Step 2: Explore Simple Layering
-- [ ] Create `scripts/experiments/composition_layering.py`
-- [ ] Generate parameter grids:
-  - Branching density × Voronoi density
-  - Different stacking orders
-  - Different line weights
-- [ ] View in gallery, identify what works
-
-### Step 3: Document Composition Principles
-- [ ] What density ratios prevent visual conflict?
-- [ ] Which pattern should dominate when?
-- [ ] How do line weights create hierarchy?
-- [ ] Update `LEARNINGS.md` with findings
-
-### Step 4: Explore Masking (If Needed)
-- [ ] If layering isn't sufficient, implement spatial masking
-- [ ] Experiment: branches only grow in selected Voronoi cells
-- [ ] Document API requirements for masking
-
-### Step 5: Design Composition API
-- [ ] Based on experiments, determine what API is needed
-- [ ] Start simple (functional composition over complex classes)
-- [ ] Only build what's proven necessary
-- [ ] Create composition presets (proven combinations)
-
-### Success Criteria
-- 5-10 proven composition examples
-- Documented principles (density ratios, hierarchy, spacing)
-- Clear understanding of required API (no premature abstraction)
-- Compositions meet manufacturing constraints
+### 2025-01-30: Performance targets
+- Field queries < 100ms for typical pattern sizes
+- Vectorized operations using numpy
+- Lazy KDTree initialization for spatial queries
+- Deterministic generation (same seed → same output)
 
 ---
 
-## Future Phases (Outline)
+## Future Phases (Preserved from Original Roadmap)
 
-### Pattern Evaluation
-Basic pattern evaluation framework. Start with simple heuristics to estimate beauty. It's a form of validation that should extend the manufacturing constraints framework.
-
-### Phase Pattern Refinement
-After understanding composition, return to optimize individual patterns:
-- Add natural constraints (tapering, collision avoidance, boundary awareness)
+### Phase 3: Pattern Refinement
+- Add natural constraints (tapering, collision, boundaries)
 - Find parameter "sweet spots" through systematic exploration
 - Build preset library of proven configurations
-- Validate against leather constraints
+- Validate against leather manufacturing constraints
 
-### Phase Composition Tooling
-- Implement composition API based on Phase 2 learnings
-- Templates for common layouts (border, corner, center)
-- Advanced masking and mutual influence
-- High-level composition functions
-
-### Phase Additional Pattern Families
+### Phase 4: Additional Pattern Families
 - Flow fields (directional texture)
 - Reaction-diffusion (organic fill)
 - Parametric curves (geometric motifs)
-- Apply composition principles from Phase 2
+- Each implements Pattern interface → immediately composable
 
-### Phase Library of "Moves"
+### Phase 5: Pattern Evaluation Framework
+- Heuristics to estimate "naturalness"
+- Manufacturing feasibility scoring
+- Visual hierarchy analysis
+
+### Phase 6: Composition Tooling
+- Templates for layouts (border, corner, center, all-over)
+- Spatial transforms (rotate, scale, repeat)
+- Advanced masking and mutual influence
+- Composition presets and recipes
+
+### Phase 7: Library of "Moves"
 - Document vocabulary of proven patterns
 - Catalog composition recipes
-- Build curated example gallery
-- Create pattern/composition presets
+- Build example gallery
+- Create preset system
 
-### Advanced Tooling
-- Interactive parameter editor in gallery
+### Phase 8: Advanced Tooling
+- Parameter editor in gallery
 - Real-time preview
-- Advanced knowledge management for research (graph RAG, embeddings)
+- Advanced knowledge management
+- Export to manufacturing formats
 
 ---
+
+## Key Principles
+
+1. **Fix before extend:** Get system working before adding features
+2. **Test continuously:** Every change should keep tests passing
+3. **Visual validation:** Generate gallery samples frequently
+4. **Determinism:** Same seed → same output (always)
+5. **Manufacturing reality:** Every pattern must be manufacturable
+6. **Document failures:** Dead ends teach us what doesn't work
+
+---
+
+## References
+
+- **Architecture:** `docs/features/composition_spec.md` - Core interfaces, usage examples
+- **Design Goals:** `docs/design_goals.md` - Philosophy and constraints
+- **Learnings:** `docs/exploration/LEARNINGS.md` - What works, what doesn't
+- **Resources:** `docs/resources/RESOURCES.md` - External references

@@ -1,9 +1,12 @@
 """Space Colonization algorithm - vectorized implementation with semantic preservation."""
 
+from collections.abc import Callable
+
 import numpy as np
 from scipy.spatial import cKDTree
 
-from bp_designs.geometry import BranchNetwork, Geometry
+from bp_designs.core.generator import Generator
+from bp_designs.geometry import BranchNetwork
 
 
 def _compute_influences_vectorized(
@@ -41,7 +44,7 @@ def _compute_influences_vectorized(
     return influenced_nodes, attraction_indices
 
 
-class SpaceColonization:
+class SpaceColonization(Generator):
     """Generate branching patterns using Space Colonization algorithm.
 
     Vectorized implementation preserving semantic information (hierarchy, branch IDs).
@@ -84,8 +87,20 @@ class SpaceColonization:
         self.height = height
         self.root_position = root_position or (width / 2, height)
 
-    def generate(self) -> Geometry:
+    def generate_pattern(
+        self,
+        guidance_field: Callable[[np.ndarray, str], np.ndarray] | None = None,
+        guidance_channel: str = "density",
+        guidance_strength: float = 1.0,
+        max_iterations: int = 1000,
+    ) -> BranchNetwork:
         """Generate branching pattern.
+
+        Args:
+            guidance_field: Optional field function(points, channel) -> values
+                          If provided, modulates growth behavior
+            guidance_channel: Which channel to sample from guidance field
+            guidance_strength: Scaling factor for guidance influence (0-1 typical)
 
         Returns:
             List of polylines representing branches
@@ -93,17 +108,45 @@ class SpaceColonization:
         Raises:
             RuntimeError: If generation fails (e.g., no growth occurred)
         """
-        network = self.generate_network()
+        network = self.generate_network(
+            guidance_field=guidance_field,
+            guidance_channel=guidance_channel,
+            guidance_strength=guidance_strength,
+        )
         return network.to_geometry()
 
-    def generate_network(self) -> BranchNetwork:
+    def generate_network(
+        self,
+        guidance_field: Callable[[np.ndarray, str], np.ndarray] | None = None,
+        guidance_channel: str = "density",
+        guidance_strength: float = 1.0,
+    ) -> BranchNetwork:
         """Generate branching pattern as semantic network.
+
+        Args:
+            guidance_field: Optional field function(points, channel) -> values
+                          If provided, modulates growth behavior
+            guidance_channel: Which channel to sample from guidance field
+            guidance_strength: Scaling factor for guidance influence (0-1 typical)
+                             Higher values = stronger influence from guidance field
 
         Returns:
             BranchNetwork with full semantic information
 
         Raises:
             RuntimeError: If generation fails
+
+        Example:
+            # Unguided growth
+            tree = gen.generate_network()
+
+            # Guided by Voronoi cells
+            voronoi = VoronoiTessellation(...).generate()
+            guided_tree = gen.generate_network(
+                guidance_field=voronoi.sample_field,
+                guidance_channel='boundary_distance',
+                guidance_strength=0.5
+            )
         """
         # Generate attraction points
         attractions = self._generate_attractions()
@@ -149,8 +192,17 @@ class SpaceColonization:
                 avg_direction = np.mean(directions, axis=0)
                 avg_direction = avg_direction / (np.linalg.norm(avg_direction) + 1e-10)
 
+                # Apply guidance field if provided
+                segment_len = self.segment_length
+                if guidance_field is not None:
+                    guidance_value = guidance_field(parent_pos.reshape(1, 2), guidance_channel)[0]
+                    # Modulate segment length based on guidance field
+                    # guidance_value typically in [0, 1], scale to affect growth
+                    scale = 1.0 + guidance_strength * (guidance_value - 0.5)
+                    segment_len = segment_len * np.clip(scale, 0.1, 2.0)
+
                 # Create new node
-                new_pos = parent_pos + avg_direction * self.segment_length
+                new_pos = parent_pos + avg_direction * segment_len
 
                 # Keep within bounds
                 new_pos[0] = np.clip(new_pos[0], 0, self.width)

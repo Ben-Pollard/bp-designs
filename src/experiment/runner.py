@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
+
 from bp_designs.export.svg import geometry_to_svg
 
 if TYPE_CHECKING:
@@ -89,7 +91,15 @@ class ExperimentRunner:
 
             try:
                 # Generate pattern
-                geometry = generator_fn(params)
+                result = generator_fn(params)
+
+                # Extract geometry from result (can be dict or direct geometry)
+                if isinstance(result, dict) and "geometry" in result:
+                    geometry = result["geometry"]
+                    metadata_result = result
+                else:
+                    geometry = result
+                    metadata_result = {}
 
                 # Save SVG
                 svg_path = self.outputs_dir / f"{variant_id}.svg"
@@ -109,6 +119,18 @@ class ExperimentRunner:
                     "svg_size": {"width": self.svg_width, "height": self.svg_height},
                     "stroke_width": self.stroke_width,
                 }
+
+                # Add serializable metadata from generator result
+                for key, value in metadata_result.items():
+                    if key != "geometry":  # Skip geometry since it's already used
+                        # Convert numpy arrays and other non-serializable types
+                        if isinstance(value, (np.ndarray, np.generic)):
+                            # Convert numpy arrays to lists
+                            metadata[key] = value.tolist()
+                        elif isinstance(value, (int, float, str, bool, list, dict, type(None))):
+                            # Include basic serializable types
+                            metadata[key] = value
+                        # Skip other non-serializable types
                 metadata_path = self.outputs_dir / f"{variant_id}.json"
                 metadata_path.write_text(json.dumps(metadata, indent=2))
 
