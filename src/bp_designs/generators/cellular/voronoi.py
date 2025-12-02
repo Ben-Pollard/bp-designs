@@ -56,8 +56,12 @@ class VoronoiTessellation(Generator):
         if render_mode not in ["edges", "cells", "both"]:
             raise ValueError(f"render_mode must be 'edges', 'cells', or 'both', got {render_mode}")
 
-    def generate(self) -> Cells:
+    def generate_pattern(self, guidance_field=None, **kwargs) -> Cells:
         """Generate Cells pattern.
+
+        Args:
+            guidance_field: Optional field function(points, channel) -> values (ignored for Voronoi)
+            **kwargs: Additional parameters (ignored)
 
         Returns:
             Cells instance implementing Pattern interface
@@ -81,6 +85,11 @@ class VoronoiTessellation(Generator):
         # Return Cells instance
         bounds = (0, 0, self.width, self.height)
         return Cells(sites=sites, vor=vor, pattern_bounds=bounds, render_mode=self.render_mode)
+
+    # Backward compatibility alias
+    def generate(self) -> Cells:
+        """Legacy method - use generate_pattern instead."""
+        return self.generate_pattern()
 
     def _generate_sites(self) -> np.ndarray:
         """Generate random Voronoi sites within canvas.

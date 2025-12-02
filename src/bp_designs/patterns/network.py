@@ -9,7 +9,7 @@ import numpy as np
 from scipy.spatial import KDTree
 
 if TYPE_CHECKING:
-    from bp_designs.geometry import Geometry
+    from bp_designs.patterns import Geometry
 
 from bp_designs.core.pattern import Pattern
 

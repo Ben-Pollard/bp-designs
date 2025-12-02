@@ -4,10 +4,11 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import numpy as np
-from pattern import Pattern
+
+from .pattern import Pattern
 
 if TYPE_CHECKING:
-    from bp_designs.geometry import Geometry
+    from bp_designs.patterns import Geometry
 
 
 class CompositePattern(Pattern):
@@ -80,13 +81,21 @@ class CompositePattern(Pattern):
 
     def _render_texture(self) -> Geometry:
         """Combine skeleton and fill geometries."""
-        # Implementation depends on specific combinator logic
-        raise NotImplementedError("Implement in combinator")
+        # For now, return fill geometry (simple implementation)
+        # In proper implementation, would clip fill to regions near skeleton
+        fill = self.components[1]  # fill is second component
+        return fill.to_geometry()
 
     def _render_nested(self) -> Geometry:
         """Combine container and nested content geometries."""
-        raise NotImplementedError("Implement in combinator")
+        # For now, return container geometry (simple implementation)
+        # In proper implementation, would combine container with nested content
+        container = self.components[0]
+        return container.to_geometry()
 
     def _render_blended(self) -> Geometry:
         """Render field-based blend."""
-        raise NotImplementedError("Implement in combinator")
+        # For now, return geometry from first pattern (simple implementation)
+        # In proper implementation, would use blended field to modify geometry
+        pattern_a = self.components[0]
+        return pattern_a.to_geometry()

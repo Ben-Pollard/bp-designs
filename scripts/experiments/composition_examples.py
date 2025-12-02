@@ -1,11 +1,15 @@
 """Generate composition examples for gallery demonstration."""
 
+import sys
+
+sys.path.insert(0, "src")
+
 from typing import Any
 
 from bp_designs.core.combinator import PatternCombinator
-from bp_designs.experiment import ExperimentRunner, ParameterSpace
-from bp_designs.patterns.branching.space_colonization import SpaceColonization
-from bp_designs.patterns.cellular.voronoi import VoronoiTessellation
+from bp_designs.generators.branching.space_colonization import SpaceColonization
+from bp_designs.generators.cellular.voronoi import VoronoiTessellation
+from experiment import ExperimentRunner, ParameterSpace
 
 
 def generate_composition_example(params: dict[str, Any]) -> dict[str, Any]:
@@ -35,7 +39,7 @@ def generate_composition_example(params: dict[str, Any]) -> dict[str, Any]:
         render_mode=params.get("render_mode", "edges"),
     )
 
-    voronoi_pattern = voronoi_gen.generate()
+    voronoi_pattern = voronoi_gen.generate_pattern()
 
     if composition_type == "guided":
         # Tree growth guided by Voronoi boundaries
@@ -48,7 +52,7 @@ def generate_composition_example(params: dict[str, Any]) -> dict[str, Any]:
 
     elif composition_type == "textured":
         # Voronoi texture around tree branches
-        tree_pattern = tree_gen.generate_network()
+        tree_pattern = tree_gen.generate_pattern()
         pattern = PatternCombinator.texture(
             skeleton=tree_pattern,
             fill=voronoi_pattern,
@@ -57,7 +61,7 @@ def generate_composition_example(params: dict[str, Any]) -> dict[str, Any]:
 
     elif composition_type == "blended":
         # Blend tree density with Voronoi boundaries
-        tree_pattern = tree_gen.generate_network()
+        tree_pattern = tree_gen.generate_pattern()
         pattern = PatternCombinator.blend(
             pattern_a=tree_pattern,
             pattern_b=voronoi_pattern,

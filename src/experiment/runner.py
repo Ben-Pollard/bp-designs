@@ -11,11 +11,12 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from bp_designs.export.svg import geometry_to_svg
+from bp_designs.core.geometry import geometry_to_svg
 
 if TYPE_CHECKING:
-    from bp_designs.experiment.params import ParameterGrid
-    from bp_designs.geometry import Geometry
+    from bp_designs.patterns import Geometry
+
+    from .params import ParameterGrid
 
 
 class ExperimentRunner:

@@ -4,6 +4,38 @@ import numpy as np
 import svgwrite
 
 
+def geometry_to_svg(
+    geometry: list[np.ndarray],
+    width: float = 100,
+    height: float = 100,
+    stroke_width: float = 0.5,
+    stroke_color: str = "#000000",
+    background: str | None = "#ffffff",
+) -> str:
+    """Convert geometry (list of polylines) to SVG string.
+
+    Args:
+        geometry: List of polylines, each as (N, 2) numpy array
+        width: SVG width in mm
+        height: SVG height in mm
+        stroke_width: Line width in mm
+        stroke_color: Stroke color (hex)
+        background: Background color (hex) or None for transparent
+
+    Returns:
+        SVG string
+    """
+    # Create Geometry object and delegate to its to_svg method
+    geom_obj = Geometry(polylines=geometry)
+    return geom_obj.to_svg(
+        width=width,
+        height=height,
+        stroke_width=stroke_width,
+        stroke_color=stroke_color,
+        background=background,
+    )
+
+
 @dataclass
 class Geometry:
     polylines: list[np.ndarray]

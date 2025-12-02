@@ -2,7 +2,8 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 
 import numpy as np
-from pattern import Pattern
+
+from .pattern import Pattern
 
 
 class Generator(ABC):

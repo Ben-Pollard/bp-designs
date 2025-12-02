@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from bp_designs.patterns.cellular import VoronoiTessellation
+from bp_designs.generators.cellular.voronoi import VoronoiTessellation
 
 
 class TestVoronoiTessellation:
@@ -12,7 +12,7 @@ class TestVoronoiTessellation:
     def test_basic_generation(self):
         """Test basic pattern generation."""
         generator = VoronoiTessellation(seed=42, num_sites=10)
-        geometry = generator.generate()
+        geometry = generator.generate_pattern().to_geometry()
 
         # Should return list of polylines
         assert isinstance(geometry, list)
@@ -38,8 +38,8 @@ class TestVoronoiTessellation:
         gen1 = VoronoiTessellation(seed=seed, **params)
         gen2 = VoronoiTessellation(seed=seed, **params)
 
-        geom1 = gen1.generate()
-        geom2 = gen2.generate()
+        geom1 = gen1.generate_pattern().to_geometry()
+        geom2 = gen2.generate_pattern().to_geometry()
 
         # Should have same number of polylines
         assert len(geom1) == len(geom2)
@@ -53,8 +53,8 @@ class TestVoronoiTessellation:
         gen1 = VoronoiTessellation(seed=1, num_sites=20)
         gen2 = VoronoiTessellation(seed=2, num_sites=20)
 
-        geom1 = gen1.generate()
-        geom2 = gen2.generate()
+        geom1 = gen1.generate_pattern().to_geometry()
+        geom2 = gen2.generate_pattern().to_geometry()
 
         # Should not be identical (at least some polylines different)
         all_same = True
@@ -68,7 +68,7 @@ class TestVoronoiTessellation:
     def test_render_mode_edges(self):
         """Test edges render mode."""
         generator = VoronoiTessellation(seed=42, num_sites=15, render_mode="edges")
-        geometry = generator.generate()
+        geometry = generator.generate_pattern().to_geometry()
 
         assert len(geometry) > 0
         # Edges should be 2-point lines
@@ -78,7 +78,7 @@ class TestVoronoiTessellation:
     def test_render_mode_cells(self):
         """Test cells render mode."""
         generator = VoronoiTessellation(seed=42, num_sites=15, render_mode="cells")
-        geometry = generator.generate()
+        geometry = generator.generate_pattern().to_geometry()
 
         assert len(geometry) > 0
         # Cells should be closed polygons (>= 3 vertices)
@@ -88,7 +88,7 @@ class TestVoronoiTessellation:
     def test_render_mode_both(self):
         """Test both render mode includes edges and cells."""
         generator = VoronoiTessellation(seed=42, num_sites=15, render_mode="both")
-        geometry = generator.generate()
+        geometry = generator.generate_pattern().to_geometry()
 
         # Should have both edges (2 points) and cells (3+ points)
         has_edges = any(len(p) == 2 for p in geometry)
@@ -106,8 +106,8 @@ class TestVoronoiTessellation:
         gen_no_relax = VoronoiTessellation(seed=42, num_sites=20, relaxation_iterations=0)
         gen_with_relax = VoronoiTessellation(seed=42, num_sites=20, relaxation_iterations=3)
 
-        geom_no_relax = gen_no_relax.generate()
-        geom_with_relax = gen_with_relax.generate()
+        geom_no_relax = gen_no_relax.generate_pattern().to_geometry()
+        geom_with_relax = gen_with_relax.generate_pattern().to_geometry()
 
         # Relaxation should change the pattern
         all_same = len(geom_no_relax) == len(geom_with_relax)
@@ -124,8 +124,8 @@ class TestVoronoiTessellation:
         gen_few = VoronoiTessellation(seed=42, num_sites=5, render_mode="cells")
         gen_many = VoronoiTessellation(seed=42, num_sites=50, render_mode="cells")
 
-        geom_few = gen_few.generate()
-        geom_many = gen_many.generate()
+        geom_few = gen_few.generate_pattern().to_geometry()
+        geom_many = gen_many.generate_pattern().to_geometry()
 
         # More sites should generally produce more cells
         # (accounting for clipping, may not be exact)
@@ -137,7 +137,7 @@ class TestVoronoiTessellation:
         generator = VoronoiTessellation(
             seed=42, num_sites=20, width=width, height=height, render_mode="both"
         )
-        geometry = generator.generate()
+        geometry = generator.generate_pattern().to_geometry()
 
         # Allow small margin for numerical precision and clipping
         margin = 1.0
@@ -155,7 +155,7 @@ class TestVoronoiTessellation:
         """Test handling of edge cases that might produce empty patterns."""
         # Very few sites might still produce some output
         generator = VoronoiTessellation(seed=42, num_sites=2)
-        geometry = generator.generate()
+        geometry = generator.generate_pattern().to_geometry()
 
         # Should at least return a list (even if empty in extreme cases)
         assert isinstance(geometry, list)
@@ -165,7 +165,7 @@ class TestVoronoiTessellation:
         generator = VoronoiTessellation(
             seed=42, num_sites=100, width=500.0, height=500.0, render_mode="edges"
         )
-        geometry = generator.generate()
+        geometry = generator.generate_pattern().to_geometry()
 
         assert len(geometry) > 0
         assert all(isinstance(p, np.ndarray) for p in geometry)

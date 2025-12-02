@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from bp_designs.geometry.network import BranchNetwork
+from bp_designs.patterns.network import BranchNetwork
 
 # Simple geometry type: list of polylines (Nx2 numpy arrays)
 Geometry = list[np.ndarray]

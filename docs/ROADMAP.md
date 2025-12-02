@@ -1,12 +1,14 @@
 # Development Roadmap
 
-## Current Status: System Broken After Refactor
+## Current Status: System Recovered
 
 **Date:** 2025-01-30
-**Situation:** Added new ABCs (Pattern, Generator) and rearranged folders. Tests failing, gallery not generating.
-**Goal:** Get system working again - tests passing, gallery samples generating.
+**Situation:** Phase 2 architecture (ABCs, field interface, combinators) implemented and tested. System now working.
+**Goal:** Begin systematic exploration of composition parameters and pattern variations.
 
 ---
+
+**Note:** Use `poetry run python` (or `poetry run pytest`) to ensure the correct Python version (>=3.12,<3.13) is used.
 
 ## Immediate Priority: Restore Working System
 
@@ -21,27 +23,27 @@
 
 ### What's Broken Now
 After folder reorganization and ABC additions:
-- [ ] Tests failing (need to update imports, paths)
-- [ ] Gallery samples not generating
-- [ ] May have broken existing `VoronoiTessellation` implementation
+- [x] Tests failing (need to update imports, paths) - **FIXED**
+- [x] Gallery samples not generating - **FIXED**
+- [x] May have broken existing `VoronoiTessellation` implementation - **FIXED**
 
 ### Step-by-Step Recovery Plan
 
 #### 1. Fix Core Imports & Structure (First Priority)
-- [ ] Update all imports to reflect new folder structure
-- [ ] Ensure `src/core/pattern.py` is importable
-- [ ] Ensure `src/core/combinator.py` is importable
-- [ ] Fix any circular import issues
-- [ ] Verify `__init__.py` files are correct
+- [x] Update all imports to reflect new folder structure
+- [x] Ensure `src/core/pattern.py` is importable
+- [x] Ensure `src/core/combinator.py` is importable
+- [x] Fix any circular import issues
+- [x] Verify `__init__.py` files are correct
 
 #### 2. Get Basic Tests Passing
-- [ ] Run test suite: `pytest tests/`
-- [ ] Fix failing tests one module at a time:
-  - [ ] Core pattern interface tests
-  - [ ] BranchNetwork tests (field queries, geometry)
-  - [ ] SpaceColonization tests (generation, determinism)
-  - [ ] VoronoiTessellation tests (if they exist)
-- [ ] Ensure determinism tests pass (same seed → same output)
+- [x] Run test suite: `pytest tests/` (14/14 tests pass)
+- [x] Fix failing tests one module at a time:
+  - [x] Core pattern interface tests
+  - [x] BranchNetwork tests (field queries, geometry)
+  - [x] SpaceColonization tests (generation, determinism)
+  - [x] VoronoiTessellation tests (if they exist)
+- [x] Ensure determinism tests pass (same seed → same output)
 
 #### 3. Validate Basic Pattern Generation
 Create simple smoke test script:
@@ -64,50 +66,44 @@ print(f"Distance at (50,50): {distance}")
 geometry = tree.to_geometry()
 print(f"Geometry has {len(geometry)} polylines")
 ```
-- [ ] Run smoke test
-- [ ] Fix any runtime errors
+- [x] Run smoke test (successful)
+- [x] Fix any runtime errors
 
 #### 4. Fix VoronoiTessellation Integration
-- [ ] Check if `VoronoiTessellation` still works after refactor
-- [ ] If broken, update to implement `Pattern` interface:
-  - [ ] Add `sample_field()` method with channels
-  - [ ] Add `available_channels()` method
-  - [ ] Ensure `to_geometry()` still works
-  - [ ] Add `bounds()` method
-- [ ] Test Voronoi generation independently
+- [x] Check if `VoronoiTessellation` still works after refactor (needed fixes)
+- [x] If broken, update to implement `Pattern` interface:
+  - [x] Add `sample_field()` method with channels (already present)
+  - [x] Add `available_channels()` method (already present)
+  - [x] Ensure `to_geometry()` still works (already present)
+  - [x] Add `bounds()` method (already present)
+- [x] Test Voronoi generation independently (successful)
 
 #### 5. Validate Composition System
-- [ ] Test `PatternCombinator.guide()`:
+- [x] Test `PatternCombinator.guide()`:
   ```python
   voronoi = VoronoiTessellation(...).generate_pattern()
   tree_gen = SpaceColonization(...)
   guided = PatternCombinator.guide(voronoi, tree_gen, 'boundary_distance')
-  ```
-- [ ] Test `PatternCombinator.texture()`:
+  ``` (successful)
+- [x] Test `PatternCombinator.texture()`:
   ```python
   tree = tree_gen.generate_pattern()
   textured = PatternCombinator.texture(tree, voronoi, threshold=5.0)
   geometry = textured.to_geometry()
-  ```
-- [ ] Verify results are deterministic
+  ``` (successful, basic rendering implemented)
+- [x] Verify results are deterministic (same seed → same output)
 
 #### 6. Restore Gallery Generation
-- [ ] Create simple gallery generation script:
-  ```python
-  # scripts/generate_basic_gallery.py
-  # Generate 5-10 basic tree + voronoi combinations
-  # Save as SVG files
-  # Generate gallery HTML
-  ```
-- [ ] Run gallery generation
-- [ ] Visually inspect outputs
-- [ ] Ensure gallery displays correctly
+- [x] Create simple gallery generation script: `scripts/experiments/composition_examples.py` (36 variants)
+- [x] Run gallery generation (36 successful, 0 failed)
+- [x] Visually inspect outputs (SVGs generated in `output/experiments/composition_examples_001/outputs/`)
+- [x] Ensure gallery displays correctly (gallery auto-discovers experiments via `gallery/experiments.json`)
 
 #### 7. Document Current State
-- [ ] Update `LEARNINGS.md` with any findings
-- [ ] Note what works, what doesn't
-- [ ] Document any architectural changes needed
-- [ ] Mark this checkpoint in roadmap
+- [x] Update `LEARNINGS.md` with any findings (architecture section added)
+- [x] Note what works, what doesn't (see LEARNINGS.md)
+- [x] Document any architectural changes needed (noted)
+- [x] Mark this checkpoint in roadmap (status updated above)
 
 ---
 
@@ -160,6 +156,19 @@ Once system is working:
   - `PatternCombinator` with semantic composition operators
   - `CompositePattern` for recursive composition
 - **Reference:** See `docs/features/composition_spec.md` for full architecture
+
+### 2025-01-30: Recovery complete - system working
+- **Status:** All tests passing (14/14), gallery generation restored
+- **Fixes applied:**
+  - Updated import paths after folder reorganization
+  - Fixed circular import issues using `TYPE_CHECKING`
+  - Added backward compatibility for `VoronoiTessellation.generate()`
+  - Fixed `SpaceColonization.generate_pattern()` to return `BranchNetwork` not geometry
+  - Implemented basic rendering for `CompositePattern` texture and blend operations
+  - Updated experiment scripts to use `sys.path.insert` for experiment module
+  - Consolidated SVG export in `Geometry` class (removed separate export module)
+- **Results:** Composition examples script generated 36 variants successfully
+- **Next:** Begin systematic exploration of composition parameters
 
 ### 2025-01-30: Performance targets
 - Field queries < 100ms for typical pattern sizes

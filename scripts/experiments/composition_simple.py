@@ -4,8 +4,8 @@ from typing import Any
 
 from bp_designs.core.combinator import PatternCombinator
 from bp_designs.experiment import ExperimentRunner, ParameterSpace
-from bp_designs.patterns.branching.space_colonization import SpaceColonization
-from bp_designs.patterns.cellular.voronoi import VoronoiTessellation
+from bp_designs.generators.branching.space_colonization import SpaceColonization
+from bp_designs.generators.cellular.voronoi import VoronoiTessellation
 
 
 def generate_textured_example(params: dict[str, Any]) -> dict[str, Any]:
@@ -34,8 +34,8 @@ def generate_textured_example(params: dict[str, Any]) -> dict[str, Any]:
         render_mode=params.get("render_mode", "edges"),
     )
 
-    voronoi_pattern = voronoi_gen.generate()
-    tree_pattern = tree_gen.generate_network()
+    voronoi_pattern = voronoi_gen.generate_pattern()
+    tree_pattern = tree_gen.generate_pattern()
 
     # Voronoi texture around tree branches
     pattern = PatternCombinator.texture(

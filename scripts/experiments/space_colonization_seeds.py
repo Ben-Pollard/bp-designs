@@ -4,13 +4,13 @@ Explores pattern diversity across different random seeds with fixed parameters.
 """
 
 from bp_designs.experiment import ExperimentRunner, ParameterSpace
-from bp_designs.patterns.branching import SpaceColonization
+from bp_designs.generators.branching.space_colonization import SpaceColonization
 
 
 def generate_pattern(params: dict):
     """Generate pattern from parameters."""
     gen = SpaceColonization(**params)
-    return gen.generate()
+    return gen.generate_pattern().to_geometry()
 
 
 def main():

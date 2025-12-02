@@ -6,10 +6,10 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import numpy as np
-from scipy.spatial import KDTree
+from scipy.spatial import KDTree, Voronoi
 
 if TYPE_CHECKING:
-    from bp_designs.geometry import Geometry
+    from bp_designs.patterns import Geometry
 
 from bp_designs.core.pattern import Pattern
 
@@ -26,6 +26,7 @@ class Cells(Pattern):
     """
 
     sites: np.ndarray  # (N, 2) - Voronoi site positions
+    vor: Voronoi  # Voronoi diagram object from scipy.spatial
     pattern_bounds: tuple[float, float, float, float]  # (xmin, ymin, xmax, ymax)
     render_mode: str = "edges"  # How to render: "edges", "cells", "both"
 

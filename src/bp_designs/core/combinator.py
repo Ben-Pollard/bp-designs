@@ -11,9 +11,11 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from .composite_pattern import CompositePattern
+
 if TYPE_CHECKING:
     from bp_designs.core.generator import Generator
-    from bp_designs.core.pattern import CompositePattern, Pattern
+    from bp_designs.core.pattern import Pattern
 
 
 class PatternCombinator:

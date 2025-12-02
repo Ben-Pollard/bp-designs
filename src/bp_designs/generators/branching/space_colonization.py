@@ -6,7 +6,7 @@ import numpy as np
 from scipy.spatial import cKDTree
 
 from bp_designs.core.generator import Generator
-from bp_designs.geometry import BranchNetwork
+from bp_designs.patterns.network import BranchNetwork
 
 
 def _compute_influences_vectorized(
@@ -113,7 +113,7 @@ class SpaceColonization(Generator):
             guidance_channel=guidance_channel,
             guidance_strength=guidance_strength,
         )
-        return network.to_geometry()
+        return network
 
     def generate_network(
         self,
