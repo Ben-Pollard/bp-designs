@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "bp-designs"
 version = "0.1.0"
-description = "Algorithmic pattern generation for leather embossing"
+description = "Algorithmic pattern generation"
 authors = ["Your Name <you@example.com>"]
 readme = "README.md"
 packages = [{include = "bp_designs", from = "src"}]

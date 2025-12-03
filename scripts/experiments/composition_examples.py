@@ -1,15 +1,11 @@
 """Generate composition examples for gallery demonstration."""
 
-import sys
-
-sys.path.insert(0, "src")
-
 from typing import Any
 
 from bp_designs.core.combinator import PatternCombinator
+from bp_designs.experiment import ExperimentRunner, ParameterSpace
 from bp_designs.generators.branching.space_colonization import SpaceColonization
 from bp_designs.generators.cellular.voronoi import VoronoiTessellation
-from experiment import ExperimentRunner, ParameterSpace
 
 
 def generate_composition_example(params: dict[str, Any]) -> dict[str, Any]:
