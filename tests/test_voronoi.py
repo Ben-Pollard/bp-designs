@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+from bp_designs.core.geometry import Geometry
 from bp_designs.generators.cellular.voronoi import VoronoiTessellation
 
 
@@ -14,12 +15,12 @@ class TestVoronoiTessellation:
         generator = VoronoiTessellation(seed=42, num_sites=10)
         geometry = generator.generate_pattern().to_geometry()
 
-        # Should return list of polylines
-        assert isinstance(geometry, list)
-        assert len(geometry) > 0
+        # Should return Geometry instance
+        assert isinstance(geometry, Geometry)
+        assert len(geometry.polylines) > 0
 
         # Each polyline should be numpy array with shape (N, 2)
-        for polyline in geometry:
+        for polyline in geometry.polylines:
             assert isinstance(polyline, np.ndarray)
             assert polyline.ndim == 2
             assert polyline.shape[1] == 2
@@ -42,10 +43,10 @@ class TestVoronoiTessellation:
         geom2 = gen2.generate_pattern().to_geometry()
 
         # Should have same number of polylines
-        assert len(geom1) == len(geom2)
+        assert len(geom1.polylines) == len(geom2.polylines)
 
         # Each polyline should be identical
-        for p1, p2 in zip(geom1, geom2, strict=True):
+        for p1, p2 in zip(geom1.polylines, geom2.polylines, strict=True):
             np.testing.assert_array_almost_equal(p1, p2)
 
     def test_different_seeds_produce_different_results(self):
@@ -58,7 +59,7 @@ class TestVoronoiTessellation:
 
         # Should not be identical (at least some polylines different)
         all_same = True
-        for p1, p2 in zip(geom1, geom2, strict=False):
+        for p1, p2 in zip(geom1.polylines, geom2.polylines, strict=False):
             if not np.allclose(p1, p2):
                 all_same = False
                 break
@@ -70,9 +71,9 @@ class TestVoronoiTessellation:
         generator = VoronoiTessellation(seed=42, num_sites=15, render_mode="edges")
         geometry = generator.generate_pattern().to_geometry()
 
-        assert len(geometry) > 0
+        assert len(geometry.polylines) > 0
         # Edges should be 2-point lines
-        for edge in geometry:
+        for edge in geometry.polylines:
             assert len(edge) == 2
 
     def test_render_mode_cells(self):
@@ -80,9 +81,9 @@ class TestVoronoiTessellation:
         generator = VoronoiTessellation(seed=42, num_sites=15, render_mode="cells")
         geometry = generator.generate_pattern().to_geometry()
 
-        assert len(geometry) > 0
+        assert len(geometry.polylines) > 0
         # Cells should be closed polygons (>= 3 vertices)
-        for cell in geometry:
+        for cell in geometry.polylines:
             assert len(cell) >= 3
 
     def test_render_mode_both(self):
@@ -91,8 +92,8 @@ class TestVoronoiTessellation:
         geometry = generator.generate_pattern().to_geometry()
 
         # Should have both edges (2 points) and cells (3+ points)
-        has_edges = any(len(p) == 2 for p in geometry)
-        has_cells = any(len(p) >= 3 for p in geometry)
+        has_edges = any(len(p) == 2 for p in geometry.polylines)
+        has_cells = any(len(p) >= 3 for p in geometry.polylines)
 
         assert has_edges and has_cells
 
@@ -110,9 +111,9 @@ class TestVoronoiTessellation:
         geom_with_relax = gen_with_relax.generate_pattern().to_geometry()
 
         # Relaxation should change the pattern
-        all_same = len(geom_no_relax) == len(geom_with_relax)
+        all_same = len(geom_no_relax.polylines) == len(geom_with_relax.polylines)
         if all_same:
-            for p1, p2 in zip(geom_no_relax, geom_with_relax, strict=True):
+            for p1, p2 in zip(geom_no_relax.polylines, geom_with_relax.polylines, strict=True):
                 if not np.allclose(p1, p2):
                     all_same = False
                     break
@@ -129,7 +130,7 @@ class TestVoronoiTessellation:
 
         # More sites should generally produce more cells
         # (accounting for clipping, may not be exact)
-        assert len(geom_many) > len(geom_few)
+        assert len(geom_many.polylines) > len(geom_few.polylines)
 
     def test_canvas_bounds(self):
         """Test that all vertices are within or near canvas bounds."""
@@ -142,7 +143,7 @@ class TestVoronoiTessellation:
         # Allow small margin for numerical precision and clipping
         margin = 1.0
 
-        for polyline in geometry:
+        for polyline in geometry.polylines:
             x_coords = polyline[:, 0]
             y_coords = polyline[:, 1]
 
@@ -157,8 +158,8 @@ class TestVoronoiTessellation:
         generator = VoronoiTessellation(seed=42, num_sites=2)
         geometry = generator.generate_pattern().to_geometry()
 
-        # Should at least return a list (even if empty in extreme cases)
-        assert isinstance(geometry, list)
+        # Should at least return a Geometry (even if empty in extreme cases)
+        assert isinstance(geometry, Geometry)
 
     def test_large_canvas(self):
         """Test generation on larger canvas."""
@@ -167,5 +168,5 @@ class TestVoronoiTessellation:
         )
         geometry = generator.generate_pattern().to_geometry()
 
-        assert len(geometry) > 0
-        assert all(isinstance(p, np.ndarray) for p in geometry)
+        assert len(geometry.polylines) > 0
+        assert all(isinstance(p, np.ndarray) for p in geometry.polylines)

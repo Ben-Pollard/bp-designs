@@ -5,7 +5,8 @@
       "Bash(poetry install:*)",
       "Bash(poetry run python:*)",
       "Bash(poetry run pytest:*)",
-      "Bash(poetry run ruff:*)"
+      "Bash(poetry run ruff:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
