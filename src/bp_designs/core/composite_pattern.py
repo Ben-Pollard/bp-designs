@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING
 
 import numpy as np
 
-from .pattern import Pattern
+from bp_designs.core.geometry import Geometry
 
-if TYPE_CHECKING:
-    from bp_designs.patterns import Geometry
+from .pattern import Pattern
 
 
 class CompositePattern(Pattern):

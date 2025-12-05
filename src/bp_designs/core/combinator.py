@@ -7,15 +7,12 @@ without custom pairwise logic.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import numpy as np
 
-from .composite_pattern import CompositePattern
+from bp_designs.core.generator import Generator
+from bp_designs.core.pattern import Pattern
 
-if TYPE_CHECKING:
-    from bp_designs.core.generator import Generator
-    from bp_designs.core.pattern import Pattern
+from .composite_pattern import CompositePattern
 
 
 class PatternCombinator:

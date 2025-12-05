@@ -7,16 +7,13 @@ import time
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
 
-from bp_designs.core.geometry import geometry_to_svg
+from bp_designs.core.geometry import Geometry
 
-if TYPE_CHECKING:
-    from bp_designs.patterns import Geometry
-
-    from .params import ParameterGrid
+from .params import ParameterGrid
 
 
 class ExperimentRunner:
@@ -104,8 +101,7 @@ class ExperimentRunner:
 
                 # Save SVG
                 svg_path = self.outputs_dir / f"{variant_id}.svg"
-                svg_string = geometry_to_svg(
-                    geometry,
+                svg_string = geometry.to_svg(
                     width=self.svg_width,
                     height=self.svg_height,
                     stroke_width=self.stroke_width,

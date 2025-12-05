@@ -3,7 +3,8 @@
 Explores key parameters: attraction_distance, num_attractions, segment_length.
 """
 
-from bp_designs.experiment import ExperimentRunner, ParameterSpace
+from bp_designs.experiment.params import ParameterSpace
+from bp_designs.experiment.runner import ExperimentRunner
 from bp_designs.generators.branching.space_colonization import SpaceColonization
 
 

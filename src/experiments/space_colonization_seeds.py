@@ -3,7 +3,8 @@
 Explores pattern diversity across different random seeds with fixed parameters.
 """
 
-from bp_designs.experiment import ExperimentRunner, ParameterSpace
+from bp_designs.experiment.params import ParameterSpace
+from bp_designs.experiment.runner import ExperimentRunner
 from bp_designs.generators.branching.space_colonization import SpaceColonization
 
 

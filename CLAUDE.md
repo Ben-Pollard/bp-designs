@@ -128,9 +128,7 @@ poetry run python -c "..." # Quick test imports/code
 - Use `TYPE_CHECKING` to avoid circular imports in type hints
 - Add `from __future__ import annotations` for forward references
 
-**Common Issues:**
-- Circular imports: Use `if TYPE_CHECKING:` for type-only imports
-- Import errors after changes: Run `poetry install` to refresh package
+
 
 ---
 

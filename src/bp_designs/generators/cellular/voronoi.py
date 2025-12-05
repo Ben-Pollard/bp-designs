@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import numpy as np
 from scipy.spatial import Voronoi
 
 from bp_designs.core.generator import Generator
 from bp_designs.patterns.cells import Cells
-
-if TYPE_CHECKING:
-    pass
 
 
 class VoronoiTessellation(Generator):

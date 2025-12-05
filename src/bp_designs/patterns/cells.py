@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
 import numpy as np
 from scipy.spatial import KDTree, Voronoi
 
-if TYPE_CHECKING:
-    from bp_designs.patterns import Geometry
-
+from bp_designs.core.geometry import Geometry
 from bp_designs.core.pattern import Pattern
 
 
@@ -84,13 +81,14 @@ class Cells(Pattern):
             Geometry based on render_mode: edges, cells, or both
         """
         if self.render_mode == "edges":
-            return self._extract_edges()
+            polylines = self._extract_edges()
         elif self.render_mode == "cells":
-            return self._extract_cells()
+            polylines = self._extract_cells()
         else:  # "both"
             edges = self._extract_edges()
             cells = self._extract_cells()
-            return edges + cells
+            polylines = edges + cells
+        return Geometry(polylines=polylines)
 
     def bounds(self) -> tuple[float, float, float, float]:
         """Return pattern bounds."""

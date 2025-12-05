@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
 import numpy as np
 from scipy.spatial import KDTree
 
-if TYPE_CHECKING:
-    from bp_designs.patterns import Geometry
-
+from bp_designs.core.geometry import Geometry
 from bp_designs.core.pattern import Pattern
 
 
@@ -166,7 +163,7 @@ class BranchNetwork(Pattern):
                 # Reverse to get root → leaf order
                 branches.append(np.array(path[::-1]))
 
-        return branches
+        return Geometry(polylines=branches)
 
     def bounds(self) -> tuple[float, float, float, float]:
         """Compute tight bounding box around all nodes.
