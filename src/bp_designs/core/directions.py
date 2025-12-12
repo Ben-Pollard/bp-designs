@@ -22,6 +22,10 @@ class PairwiseCoordinateVectors:
             vectors=self.vectors[n], norms=self.norms[n], directions=self.directions[n]
         )
 
+    @property
+    def empty(self) -> bool:
+        return self.vectors.size == 0
+
 
 @dataclass
 class DirectionVectors:

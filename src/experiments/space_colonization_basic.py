@@ -20,7 +20,7 @@ def main():
     space = ParameterSpace(
         name="space_colonization_basic",
         ranges={
-            "num_attractions": [20, 50, 100],  # 3 values
+            "num_attractions": [1, 2, 3],  # 3 values
             "segment_length": [1.0, 2.0, 4.0],  # 3 values
         },
         fixed={

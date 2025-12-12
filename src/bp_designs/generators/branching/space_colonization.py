@@ -40,7 +40,6 @@ class SpaceColonization(Generator):
             height: Canvas height
             root_position: Starting position (default: bottom center)
         """
-        self.seed = seed
         self.rng = np.random.default_rng(seed)
 
         self.num_attractions = num_attractions
@@ -49,6 +48,7 @@ class SpaceColonization(Generator):
         self.width = width
         self.height = height
         self.root_positions = root_position or np.array([(width / 2, height)])
+        np.random.seed(seed)
 
     def generate_pattern(
         self,
@@ -73,7 +73,7 @@ class SpaceColonization(Generator):
         """
         initial_timestamp = 0
         network_previous = self._initialize_network(initial_timestamp)
-        attractions = self._initialize_attractions()
+        attractions = self._initialize_attractions(0)
 
         for _ in range(max_iterations):
             network, attractions = self._iterate(network_previous, attractions)
@@ -102,11 +102,11 @@ class SpaceColonization(Generator):
         )
         return network
 
-    def _initialize_attractions(self) -> np.ndarray:
+    def _initialize_attractions(self, num_attractions) -> np.ndarray:
         # Optionally accept a guidance field to represent attractions
-        rng = np.random.default_rng(self.seed)
-        x = rng.uniform(0, self.width, self.num_attractions)
-        y = rng.uniform(0, self.height, self.num_attractions)
+        rng = np.random.default_rng()
+        x = rng.uniform(0, self.width, num_attractions)
+        y = rng.uniform(0, self.height, num_attractions)
         attractions = rearrange([x, y], "x y -> y x")  # (N,2)
         return attractions
 
@@ -140,6 +140,10 @@ class SpaceColonization(Generator):
         Returns:
             (2, N) array of growth vectors for each node
         """
+        if attraction_vectors.empty:
+            return DirectionVectors(
+                vectors=np.empty([0, 2]), norms=np.empty([0]), directions=np.empty([0, 2])
+            )
         # Nodes grow if they are nearest to a source
         # Nodes are influenced only by the sources they are closest to
         closest_nodes = attraction_vectors.norms.argmin(axis=0)  # (M,)
@@ -162,37 +166,46 @@ class SpaceColonization(Generator):
     def _iterate(
         self, network: BranchNetwork, attractions: np.ndarray
     ) -> tuple[BranchNetwork, np.ndarray]:
-        """
-        To do:
-        - prevent repetition
-        - placement of new candidate sources
-        """
+        """ """
+        # Place new attractions
+        new_attractions = self._initialize_attractions(self.num_attractions)
+
+        # Check neighbourhoods for inclusion of previously placed attractions
+        if attractions.size > 0:
+            new_attr_vectors = rearrange(attractions, "m c -> 1 m c") - rearrange(
+                new_attractions, "mn c -> mn 1 c"
+            )  # (mn m c)
+            new_attr_norms = np.linalg.norm(new_attr_vectors, axis=2)  # (mn, m)
+            new_attr_selection = reduce(new_attr_norms, "mn m -> mn", "min") > self.kill_distance
+            attractions = np.vstack([attractions, new_attractions[new_attr_selection, :]])
+        else:
+            attractions = new_attractions
+
+        # Calculate vectors between nodes and sources
+        attraction_vectors = self._attraction_vectors(network, attractions)
 
         # Remove colonized attractions (those within kill distance of nodes)
-        attraction_vectors = self._attraction_vectors(network, attractions)
         kill_mask = reduce(attraction_vectors.norms, "n m -> m", "min") > self.kill_distance
         attractions = attractions[kill_mask, :]
 
+        # Calculate the attraction vectors
         attraction_vectors = self._attraction_vectors(network, attractions)
 
-        # A growing node is one that is closest to any given source
+        # Filter tree down to just the growing nodes
         growth_node_indices = np.unique(attraction_vectors.norms.argmin(axis=0))
         growing_nodes = network.get_nodes(growth_node_indices)
         attraction_vectors = attraction_vectors.get_n(growth_node_indices)
 
-        # Nodes grow if they are nearest to a source
-        # Nodes are influenced only by the sources they are closest to
+        # Calculate growth vectors of growing nodes
         growth_vectors = self._growth_vectors(attraction_vectors)
 
-        # growing_nodes = network  # temporary
-
+        # Create updated network with new nodes
         new_positions = growing_nodes.positions + growth_vectors.vectors
         num_new_nodes = new_positions.shape[0]
         next_node_id = network.node_ids.max() + 1
         new_node_ids = np.arange(next_node_id, next_node_id + num_new_nodes)
         new_timestamps = np.full(num_new_nodes, network.timestamps.max() + 1, dtype=np.int16)
 
-        # Create updated network with new nodes
         updated_network = BranchNetwork(
             node_ids=np.hstack([network.node_ids, new_node_ids]),
             positions=np.vstack([network.positions, new_positions]),
