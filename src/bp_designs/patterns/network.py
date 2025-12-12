@@ -32,10 +32,9 @@ class BranchNetwork(Pattern):
         - 'direction': Growth direction (returns (N, 2))
     """
 
+    node_ids: np.ndarray  # (N,) - Node IDs
     positions: np.ndarray  # (N, 2) - Node positions
     parents: np.ndarray  # (N,) - Parent indices (-1 for roots)
-    depths: np.ndarray  # (N,) - Hierarchy depth from root
-    branch_ids: np.ndarray  # (N,) - Which branch each node belongs to
     timestamps: np.ndarray  # (N,) - Growth order (iteration when added)
 
     # Field query configuration
@@ -48,8 +47,6 @@ class BranchNetwork(Pattern):
         """Validate structure."""
         n = len(self.positions)
         assert self.parents.shape == (n,), "parents must be (N,)"
-        assert self.depths.shape == (n,), "depths must be (N,)"
-        assert self.branch_ids.shape == (n,), "branch_ids must be (N,)"
         assert self.timestamps.shape == (n,), "timestamps must be (N,)"
         assert self.positions.shape == (n, 2), "positions must be (N, 2)"
 
@@ -229,6 +226,28 @@ class BranchNetwork(Pattern):
         """
         return np.where(self.parents == -1)[0]
 
+    def get_latest_nodes(self) -> BranchNetwork:
+        """Get subset of network up to and including a specific timestamp.
+
+        Args:
+            timestamp: Maximum timestamp to include
+
+        Returns:
+            New BranchNetwork containing only nodes with timestamps <= given timestamp
+        """
+        latest_timestamp = np.max(self.timestamps)
+        mask = self.timestamps == latest_timestamp
+        return self.get_nodes(mask)
+
+    def get_nodes(self, selection) -> BranchNetwork:
+        return BranchNetwork(
+            node_ids=self.node_ids[selection],
+            positions=self.positions[selection],
+            parents=self.parents[selection],
+            timestamps=self.timestamps[selection],
+            density_falloff=self.density_falloff,
+        )
+
     def taper_weights(self, base_width: float = 1.0, taper_rate: float = 0.8) -> np.ndarray:
         """Compute stroke widths based on hierarchy depth.
 
@@ -243,27 +262,55 @@ class BranchNetwork(Pattern):
         """
         return base_width * (taper_rate**self.depths)
 
-    @classmethod
-    def from_node_list(cls, nodes: list[dict], compute_branches: bool = True) -> BranchNetwork:
-        """Convert list-of-dicts representation to vectorized structure.
+    # @classmethod
+    # def from_node_list(cls, nodes: list[dict], compute_branches: bool = True) -> BranchNetwork:
+    #     """Convert list-of-dicts representation to vectorized structure.
 
-        Useful for converting from legacy implementation or simple builders.
+    #     Useful for converting from legacy implementation or simple builders.
 
-        Args:
-            nodes: List of {"pos": np.array, "parent": int, "timestamp": int}
-            compute_branches: If True, compute branch IDs by tracing to leaves
+    #     Args:
+    #         nodes: List of {"pos": np.array, "parent": int, "timestamp": int}
+    #         compute_branches: If True, compute branch IDs by tracing to leaves
 
-        Returns:
-            BranchNetwork instance
-        """
-        n = len(nodes)
+    #     Returns:
+    #         BranchNetwork instance
+    #     """
+    #     n = len(nodes)
 
-        # Extract arrays
-        positions = np.array([node["pos"] for node in nodes])
-        parents = np.array([node.get("parent", -1) for node in nodes], dtype=int)
-        timestamps = np.array([node.get("timestamp", i) for i, node in enumerate(nodes)])
+    #     # Extract arrays
+    #     positions = np.array([node["pos"] for node in nodes])
+    #     parents = np.array([node.get("parent", -1) for node in nodes], dtype=int)
+    #     timestamps = np.array([node.get("timestamp", i) for i, node in enumerate(nodes)])
 
-        # Compute depths
+    #     # Compute depths
+    #     depths = np.zeros(n, dtype=int)
+    #     for i in range(n):
+    #         depth = 0
+    #         current = i
+    #         while parents[current] != -1:
+    #             depth += 1
+    #             current = parents[current]
+    #             if depth > n:  # Cycle detection
+    #                 raise ValueError(f"Cycle detected at node {i}")
+    #         depths[i] = depth
+
+    #     # Compute branch IDs if requested
+    #     if compute_branches:
+    #         branch_ids = cls._compute_branch_ids(parents)
+    #     else:
+    #         branch_ids = np.zeros(n, dtype=int)
+
+    #     return cls(
+    #         positions=positions,
+    #         parents=parents,
+    #         depths=depths,
+    #         branch_ids=branch_ids,
+    #         timestamps=timestamps,
+    #     )
+
+    @staticmethod
+    def _compute_depths(parents) -> np.ndarray:
+        n = len(parents)
         depths = np.zeros(n, dtype=int)
         for i in range(n):
             depth = 0
@@ -274,20 +321,7 @@ class BranchNetwork(Pattern):
                 if depth > n:  # Cycle detection
                     raise ValueError(f"Cycle detected at node {i}")
             depths[i] = depth
-
-        # Compute branch IDs if requested
-        if compute_branches:
-            branch_ids = cls._compute_branch_ids(parents)
-        else:
-            branch_ids = np.zeros(n, dtype=int)
-
-        return cls(
-            positions=positions,
-            parents=parents,
-            depths=depths,
-            branch_ids=branch_ids,
-            timestamps=timestamps,
-        )
+        return depths
 
     @staticmethod
     def _compute_branch_ids(parents: np.ndarray) -> np.ndarray:

@@ -12,6 +12,7 @@ numpy = "^2.3.5"
 numba = "^0.62.1"
 scipy = "^1.16.3"
 svgwrite = "^1.4.3"
+einops = "^0.8.1"
 
 
 [tool.poetry.group.dev.dependencies]
