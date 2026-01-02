@@ -1,18 +1,14 @@
 # Development Roadmap
 
+
 ### Phase 1: Generator detail and composition interface ###
-- [ ] Make scratch example of SpaceColonisation
-  - [ ] Use geometry class from shapely
-  - [ ] Growth: accept initial and maximum bounds as geometries
-  - [ ] Growth: vein size implementation
-  - [ ] Make geometry a property of pattern
-  - [ ] linear algebra representation of spacecol
-  - [ ] revisit channel exposure - channels and mechanism
-  - [ ] Use a pattern as bounds
-  - [ ] Visualise a channel
-  - [ ] Define constraints
-- [ ] Plug in to interfaces
-- [ ] Redo Voronoi in the same way
+- [ ] simple 2-d pattern generators: oval, rectangle, polygon.
+- [ ] Integrate updated geometry api to get space colonisation working again
+  - [ ] While implementing growth: accept initial and maximum bounds as polygons in place of width/height. Restrict attractor generation to intital bounds, expand intitial bounds around current nodes, kill out-of-bounds sources.
+- [ ] Growth: vein size implementation, following original paper
+
+###
+- [ ] Redo Voronoi following code style and architecture practices learned from space col
 
 ### Phase 2 Completion: Exploration & Documentation
 - [ ] Generate systematic variations:

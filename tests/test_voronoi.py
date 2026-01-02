@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from bp_designs.core.geometry import Geometry
+from bp_designs.core.geometry import Polyline
 from bp_designs.generators.cellular.voronoi import VoronoiTessellation
 
 
@@ -16,7 +16,7 @@ class TestVoronoiTessellation:
         geometry = generator.generate_pattern().to_geometry()
 
         # Should return Geometry instance
-        assert isinstance(geometry, Geometry)
+        assert isinstance(geometry, Polyline)
         assert len(geometry.polylines) > 0
 
         # Each polyline should be numpy array with shape (N, 2)
@@ -159,7 +159,7 @@ class TestVoronoiTessellation:
         geometry = generator.generate_pattern().to_geometry()
 
         # Should at least return a Geometry (even if empty in extreme cases)
-        assert isinstance(geometry, Geometry)
+        assert isinstance(geometry, Polyline)
 
     def test_large_canvas(self):
         """Test generation on larger canvas."""

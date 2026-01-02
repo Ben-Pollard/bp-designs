@@ -1,11 +1,65 @@
+from abc import ABC
 from dataclasses import dataclass
 
 import numpy as np
 import svgwrite
 
 
+class Geometry(ABC):
+    """
+    Base class for geometries. Servers as a data layer to translate between
+    internal and library geometry representations.
+    """
+
+    dim: int
+    attrs: dict
+
+
 @dataclass
-class Geometry:
+class Point(Geometry):
+    x: int
+    y: int
+    z: int | None
+
+
+@dataclass
+class PointSet(Geometry):
+    points: np.ndarray  # shape (N, D)
+    channels: dict[str, np.ndarray]  # each shape (N, k)
+
+
+@dataclass
+class Polygon(Geometry):
+    """2D polygon defined by sequence of points."""
+
+    coords: np.ndarray  # shape (N, 2) - polygon vertices in order
+
+    def __post_init__(self):
+        """Validate shape."""
+        if self.coords.ndim != 2 or self.coords.shape[1] != 2:
+            raise ValueError(f"coords must be (N, 2), got {self.coords.shape}")
+
+    def bounds(self) -> tuple[float, float, float, float]:
+        """Return bounding box (xmin, ymin, xmax, ymax)."""
+        if len(self.coords) == 0:
+            return (0.0, 0.0, 0.0, 0.0)
+        xmin, ymin = self.coords.min(axis=0)
+        xmax, ymax = self.coords.max(axis=0)
+        return (float(xmin), float(ymin), float(xmax), float(ymax))
+
+
+@dataclass
+class Canvas(Polygon):
+    pass
+
+
+@dataclass
+class Mesh(Geometry):
+    pass
+
+
+@dataclass
+class Polyline(Geometry):
     polylines: list[np.ndarray]
 
     def to_svg(

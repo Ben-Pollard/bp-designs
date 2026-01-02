@@ -1,12 +1,13 @@
 """Space Colonization algorithm - vectorized implementation with semantic preservation."""
 
-from collections.abc import Callable
-
 import numpy as np
 from einops import rearrange, reduce
+from shapely.geometry import Point as ShapelyPoint
+from shapely.geometry import Polygon as ShapelyPolygon
 
 from bp_designs.core.directions import DirectionVectors, PairwiseCoordinateVectors
 from bp_designs.core.generator import Generator
+from bp_designs.core.geometry import Canvas, Point, Polygon
 from bp_designs.patterns.network import BranchNetwork
 
 
@@ -21,62 +22,62 @@ class SpaceColonization(Generator):
 
     def __init__(
         self,
+        canvas: Canvas,
+        root_position: Point,
+        initial_boundary: Polygon,
+        final_boundary: Polygon,
         seed: int = 0,
         num_attractions: int = 500,
         kill_distance: float = 5.0,
         segment_length: float = 2.0,
-        width: float = 100.0,
-        height: float = 100.0,
-        root_position: tuple[float, float] | None = None,
+        max_iterations: int = 1000,
     ):
         """Initialize Space Colonization generator.
 
         Args:
+            canvas: defines the coordinate system
+            root_position: Starting position (default: bottom center)
+            initial_boundary: Polygon for initial attraction points
+            final_boundary: Polygon for maximum growth region
             seed: Random seed for determinism
             num_attractions: Number of attraction points (growth targets)
             kill_distance: Distance at which attraction points are removed
             segment_length: Length of each growth segment
-            width: Canvas width
-            height: Canvas height
-            root_position: Starting position (default: bottom center)
+            max_iterations: Maximum number of growth iterations
         """
         self.rng = np.random.default_rng(seed)
 
         self.num_attractions = num_attractions
         self.kill_distance = kill_distance
         self.segment_length = segment_length
-        self.width = width
-        self.height = height
-        self.root_positions = root_position or np.array([(width / 2, height)])
-        np.random.seed(seed)
+        self.root_position = root_position
+        self.canvas = canvas
+        # Convert Point to array for positions
+        self.root_position_array = np.array([root_position.x, root_position.y], dtype=float)
+        # Store boundaries and iteration limit
+        self.initial_boundary = initial_boundary
+        self.final_boundary = final_boundary
+        self.max_iterations = max_iterations
 
-    def generate_pattern(
-        self,
-        guidance_field: Callable[[np.ndarray, str], np.ndarray] | None = None,
-        guidance_channel: str = "density",
-        guidance_strength: float = 1.0,
-        max_iterations: int = 1000,
-    ) -> BranchNetwork:
-        """Generate branching pattern.
+    def generate_pattern(self, **kwargs) -> BranchNetwork:
+        """Generate branching pattern using stored parameters.
 
         Args:
-            guidance_field: Optional field function(points, channel) -> values
-                          If provided, modulates growth behavior
-            guidance_channel: Which channel to sample from guidance field
-            guidance_strength: Scaling factor for guidance influence (0-1 typical)
+            **kwargs: For compatibility with Generator interface (ignored)
 
         Returns:
-            List of polylines representing branches
+            BranchNetwork representing the generated branching pattern
 
         Raises:
             RuntimeError: If generation fails (e.g., no growth occurred)
         """
         initial_timestamp = 0
         network_previous = self._initialize_network(initial_timestamp)
-        attractions = self._initialize_attractions(0)
 
-        for _ in range(max_iterations):
-            network, attractions = self._iterate(network_previous, attractions)
+        attractions = self._initialize_attractions(0, self.initial_boundary)
+
+        for _ in range(self.max_iterations):
+            network, attractions = self._iterate(network_previous, attractions, self.final_boundary)
             if len(attractions) == 0:
                 break
             if network.num_nodes == network_previous.num_nodes:
@@ -96,19 +97,53 @@ class SpaceColonization(Generator):
         """
         network = BranchNetwork(
             node_ids=np.array([0], dtype=np.int16),  # (N,) - start node IDs at 0
-            positions=self.root_positions,  # (N,2)
+            positions=self.root_position_array.reshape(1, 2),  # (N,2) - root position as array
             parents=np.array([-1], dtype=np.int16),  # (N,) - root has no parent
             timestamps=np.array([timestamp], dtype=np.int16),  # (N,) - root timestamp
         )
         return network
 
-    def _initialize_attractions(self, num_attractions) -> np.ndarray:
-        # Optionally accept a guidance field to represent attractions
-        rng = np.random.default_rng()
-        x = rng.uniform(0, self.width, num_attractions)
-        y = rng.uniform(0, self.height, num_attractions)
-        attractions = rearrange([x, y], "x y -> y x")  # (N,2)
-        return attractions
+    def _initialize_attractions(self, num_attractions: int, boundary: Polygon) -> np.ndarray:
+        """Generate attraction points inside boundary polygon.
+
+        Uses rejection sampling: generate points in bounding box,
+        keep only those inside polygon using shapely.
+
+        Args:
+            num_attractions: Number of attraction points to generate
+            boundary: Polygon defining region
+
+        Returns:
+            (N, 2) array of attraction point positions inside boundary
+        """
+        if num_attractions <= 0:
+            return np.array([], dtype=float).reshape(0, 2)
+
+        # Get bounding box for efficient sampling
+        bounds = boundary.bounds()
+        xmin, ymin, xmax, ymax = bounds
+
+        # Create shapely polygon for containment checks
+        shapely_poly = ShapelyPolygon(boundary.coords)
+
+        points = []
+        batch_size = min(num_attractions * 2, 1000)
+
+        while len(points) < num_attractions:
+            # Generate candidate points in bounding box
+            x = self.rng.uniform(xmin, xmax, batch_size)
+            y = self.rng.uniform(ymin, ymax, batch_size)
+            candidates = np.column_stack([x, y])  # (batch_size, 2)
+
+            # Check which points are inside polygon using shapely
+            # Simple loop is fine for now
+            for point in candidates:
+                if shapely_poly.contains(ShapelyPoint(point)):
+                    points.append(point)
+                    if len(points) >= num_attractions:
+                        break
+
+        return np.array(points[:num_attractions])
 
     def _attraction_vectors(
         self, network: BranchNetwork, attractions: np.ndarray
@@ -164,11 +199,17 @@ class SpaceColonization(Generator):
         )
 
     def _iterate(
-        self, network: BranchNetwork, attractions: np.ndarray
+        self,
+        network: BranchNetwork,
+        attractions: np.ndarray,
+        final_boundary: Polygon,
     ) -> tuple[BranchNetwork, np.ndarray]:
         """ """
+        # For now, use final_boundary as current boundary
+        # TODO: Compute proper current boundary that encapsulates nodes + segment length
+        current_boundary = final_boundary
         # Place new attractions
-        new_attractions = self._initialize_attractions(self.num_attractions)
+        new_attractions = self._initialize_attractions(self.num_attractions, current_boundary)
 
         # Check neighbourhoods for inclusion of previously placed attractions
         if attractions.size > 0:

@@ -1,6 +1,6 @@
-{
-  "statusLine": {
-    "type": "command",
-    "command": "input=$(cat); dir=$(basename \"$(echo \"$input\" | jq -r '.workspace.current_dir')\"); model=$(echo \"$input\" | jq -r '.model.display_name'); transcript=$(echo \"$input\" | jq -r '.transcript_path'); if [ -f \"$transcript\" ]; then tokens=$(grep -o 'Token usage: [0-9]*/[0-9]*' \"$transcript\" | tail -1 | awk '{print $3}'); used=$(echo $tokens | cut -d'/' -f1); total=$(echo $tokens | cut -d'/' -f2); if [ -n \"$used\" ] && [ -n \"$total\" ]; then pct=$((used * 100 / total)); bars=$((pct / 5)); filled=$(printf '█%.0s' $(seq 1 $bars)); empty=$(printf '░%.0s' $(seq 1 $((20 - bars)))); echo \"$dir | $model | Context: [$filled$empty] $pct%\"; else echo \"$dir | $model | Context: [░░░░░░░░░░░░░░░░░░░░] 0%\"; fi; else echo \"$dir | $model | Context: [░░░░░░░░░░░░░░░░░░░░] 0%\"; fi"
-  }
-}
+// {
+//   "statusLine": {
+//     "type": "command",
+//     "command": "input=$(cat); dir=$(basename \"$(echo \"$input\" | jq -r '.workspace.current_dir')\"); model=$(echo \"$input\" | jq -r '.model.display_name'); transcript=$(echo \"$input\" | jq -r '.transcript_path'); if [ -f \"$transcript\" ]; then tokens=$(grep -o 'Token usage: [0-9]*/[0-9]*' \"$transcript\" | tail -1 | awk '{print $3}'); used=$(echo $tokens | cut -d'/' -f1); total=$(echo $tokens | cut -d'/' -f2); if [ -n \"$used\" ] && [ -n \"$total\" ]; then pct=$((used * 100 / total)); bars=$((pct / 5)); filled=$(printf '█%.0s' $(seq 1 $bars)); empty=$(printf '░%.0s' $(seq 1 $((20 - bars)))); echo \"$dir | $model | Context: [$filled$empty] $pct%\"; else echo \"$dir | $model | Context: [░░░░░░░░░░░░░░░░░░░░] 0%\"; fi; else echo \"$dir | $model | Context: [░░░░░░░░░░░░░░░░░░░░] 0%\"; fi"
+//   }
+// }

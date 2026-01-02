@@ -13,6 +13,7 @@ numba = "^0.62.1"
 scipy = "^1.16.3"
 svgwrite = "^1.4.3"
 einops = "^0.8.1"
+shapely = "^2.1.2"
 
 
 [tool.poetry.group.dev.dependencies]

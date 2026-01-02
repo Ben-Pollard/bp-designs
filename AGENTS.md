@@ -22,10 +22,9 @@ At the start of each session or when resuming work:
    - Skim recent dated files if relevant to current work
 
 3. **Read selectively based on current work:**
-   - Implementing a pattern → Read `src/patterns/[pattern-family]/README.md`
-   - Exploring parameters → Check `docs/exploration/LEARNINGS.md` for proven configurations
-   - Validating constraints → Consult `docs/DESIGN_NOTES.md` (constraints section)
+   - Validating constraints → Consult `docs/design_goals.md` (constraints section)
    - Need external references → Check `docs/resources/RESOURCES.md`
+   - `docs/api.md` for architecture guidance
 
 4. **Summarize context:** Briefly confirm what you've learned before proceeding
 
@@ -44,7 +43,7 @@ Minimize token usage by reading only what's relevant. Maintain enough context to
 | `docs/exploration/LEARNINGS.md` | Before experiments, when stuck | What works, what doesn't, proven patterns |
 | `docs/resources/algorithms.md` | Choosing approach | Quick algorithm overviews |
 | `docs/resources/RESOURCES.md` | Need citations/examples | External papers, examples, tools |
-| `docs/api.md` | Writing pattern code | Pattern generator API reference |
+| `docs/api.md` | Writing generator, pattern or geometry code | API philosophy |
 | `docs/ARCHITECTURE_GALLERY.md` | Working on experiments/gallery | Gallery system architecture, data schemas |
 
 ### Documentation During Work
@@ -62,10 +61,6 @@ Minimize token usage by reading only what's relevant. Maintain enough context to
 
 ## Core Behavior Principles
 
-### 1. Algorithmic > AI
-**Never suggest:** AI image models, diffusion generation, neural style transfer, or machine learning approaches.
-
-**Always use:** Explicit algorithms (L-systems, flow fields, reaction-diffusion, Voronoi, Delaunay, Perlin noise, etc.)
 
 ### 2. Composability First
 Write code that is:
@@ -87,7 +82,6 @@ Avoid vague suggestions. Provide:
 - Concrete algorithms with pseudocode
 - Clean, tested implementations
 - Rigorous mathematical reasoning
-- Implementable geometry (not hand-wavy "looks organic")
 
 Convert aesthetic goals → computational steps.
 
@@ -123,23 +117,10 @@ poetry run ruff format  # Format code
 poetry run python -c "..." # Quick test imports/code
 ```
 
-**Import Best Practices:**
-- Always import from `bp_designs.*` (e.g., `from bp_designs.patterns.branching import SpaceColonization`)
-- Use `TYPE_CHECKING` to avoid circular imports in type hints
-- Add `from __future__ import annotations` for forward references
-
-
-
----
 
 ## Development Workflow
 
-### Jupyter-First Exploration
-1. Work interactively in notebooks
-2. Generate variations quickly
-3. Run systematic experiments (see Experimentation Workflow below)
-4. Iterate on parameters based on visual results
-5. Graduate working code to modules
+
 
 ### Experimentation Workflow
 
@@ -187,49 +168,17 @@ open gallery/index.html
 ### When Answering Questions
 
 **If asked to write code:**
-- Generate full, working modules or functions
-- Include imports and any helper functions needed
-- Add brief usage example
+- Update API docs
+- Take guidance in order of preference from `docs/api.md`, then ABCs in `src/bp_designs/core`, then type hints, then comments, and finally code
 
-**If asked for architecture:**
-- Propose clear, modular structures with rationale
-- Show how pieces compose
-- Consider testing strategy
 
-**If asked conceptual questions:**
-- Ground answers in specific algorithms
-- Reference known techniques by name
-- Provide concrete examples
-
-**If asked for aesthetics:**
-- Translate to parameters or algorithmic choices
-- Suggest variations to try
-- Explain mathematical implications
 
 ### When Uncertain
 
 1. **Check documentation first:**
-   - `DESIGN_NOTES.md` for philosophy and constraints
-   - `LEARNINGS.md` for proven approaches
-   - `ROADMAP.md` for current priorities
-
 2. **Ask clarifying questions:**
-   - What's the manufacturing constraint?
-   - What aesthetic quality matters most?
-   - Should this be a new pattern or variation?
-
 3. **Choose simpler:**
-   - When in doubt, pick the more modular solution
-   - Prefer composition over complexity
-   - Optimize for iteration speed
 
-### Red Flags to Avoid
-
-- "You could use AI to generate..."
-- "Just adjust until it looks right..."
-- "This is too complex to implement..."
-- Suggesting manual intervention in generation
-- Proposing non-deterministic outputs
 
 ---
 
@@ -242,10 +191,6 @@ When completing significant work:
    - Update status if phase changed
    - Note blockers or findings
 
-2. **Document findings:**
-   - Add insights to `LEARNINGS.md`
-   - Create `exploration/*.md` if experimenting
-   - Note dead ends (valuable for future)
 
 3. **Suggest next steps:**
    - Point to logical next exploration
@@ -262,9 +207,3 @@ When completing significant work:
 - Visual results > code elegance (but both matter)
 - Iteration is the creative process
 - Document failures (they teach us)
-
-**When stuck:**
-1. Check `LEARNINGS.md`
-2. Review similar pattern implementations
-3. Break problem into smaller algorithmic steps
-4. Prototype in notebook before architecting
