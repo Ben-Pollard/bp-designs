@@ -2,8 +2,9 @@
 
 import numpy as np
 
-from bp_designs.core.geometry import Canvas, Point, Polygon
+from bp_designs.core.geometry import Canvas, Point
 from bp_designs.generators.branching.space_colonization import SpaceColonization
+from bp_designs.generators.primitives.two_d import Oval
 
 
 class TestSpaceColonization:
@@ -16,8 +17,8 @@ class TestSpaceColonization:
         # Root position at center
         self.root_position = Point(x=50, y=50, z=None)
         # Initial and final boundaries (same for simplicity)
-        self.initial_boundary = Polygon(coords=np.array([[10, 10], [90, 10], [90, 90], [10, 90]]))
-        self.final_boundary = Polygon(coords=np.array([[0, 0], [100, 0], [100, 100], [0, 100]]))
+        self.initial_boundary = Oval.from_width_height(50, 50).generate_pattern()
+        self.final_boundary = Oval.from_width_height(70, 70).generate_pattern()
 
     def test_basic_generation(self):
         """Test basic pattern generation."""
@@ -243,12 +244,13 @@ class TestSpaceColonization:
     def test_boundary_containment(self):
         """Test that generated nodes stay within final boundary."""
         # Use a smaller final boundary to test containment
-        small_boundary = Polygon(coords=np.array([[20, 20], [80, 20], [80, 80], [20, 80]]))
+        small_boundary = Oval.from_width_height(40,40, canvas=self.canvas).generate_pattern()
+        initial_boundary = Oval.from_width_height(50,50, canvas=self.canvas).generate_pattern()
 
         generator = SpaceColonization(
             canvas=self.canvas,
             root_position=self.root_position,
-            initial_boundary=self.initial_boundary,
+            initial_boundary=initial_boundary,
             final_boundary=small_boundary,
             seed=42,
             num_attractions=50,
@@ -261,7 +263,7 @@ class TestSpaceColonization:
         # All positions should be within or near the final boundary
         # Allow small margin for numerical precision
         margin = 1e-6
-        bounds = small_boundary.bounds()
+        bounds = small_boundary.polygon.bounds()
         xmin, ymin, xmax, ymax = bounds
 
         for pos in network.positions:
@@ -290,7 +292,7 @@ class TestSpaceColonization:
 
     def test_edge_case_small_boundary(self):
         """Test with very small boundary."""
-        tiny_boundary = Polygon(coords=np.array([[45, 45], [55, 45], [55, 55], [45, 55]]))
+        tiny_boundary = Oval.from_width_height(5,5).generate_pattern()
 
         generator = SpaceColonization(
             canvas=self.canvas,

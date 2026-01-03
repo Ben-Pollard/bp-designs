@@ -496,3 +496,36 @@ class Cells(Pattern):
         t = max(0.0, min(1.0, t))
 
         return np.array([p1[0] + t * dx, p1[1] + t * dy])
+
+    def __str__(self) -> str:
+        """Return human-readable string representation."""
+        num_sites = len(self.sites) if self.sites is not None else 0
+        return f"VoronoiCells(N={num_sites}, mode={self.render_mode})"
+
+    def __eq__(self, other: object) -> bool:
+        """Equality based on sites and pattern bounds."""
+        if not isinstance(other, Cells):
+            return False
+        # Compare sites arrays
+        if self.sites.shape != other.sites.shape:
+            return False
+        if not np.array_equal(self.sites, other.sites):
+            return False
+        # Compare pattern bounds
+        if self.pattern_bounds != other.pattern_bounds:
+            return False
+        # Compare render mode
+        if self.render_mode != other.render_mode:
+            return False
+        return True
+
+    def __hash__(self) -> int:
+        """Hash based on sites data and pattern bounds."""
+        # Convert sites to tuple of tuples for hashing
+        if self.sites.size == 0:
+            sites_hash = hash(())
+        else:
+            sites_tuple = tuple(tuple(map(float, point)) for point in self.sites)
+            sites_hash = hash(sites_tuple)
+        # Combine with pattern bounds and render mode
+        return hash((sites_hash, self.pattern_bounds, self.render_mode))

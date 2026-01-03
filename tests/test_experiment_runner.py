@@ -190,12 +190,12 @@ class TestExperimentRunner:
             assert "canvas" in params
             assert "root_position" in params
             assert "boundary" in params
-            assert isinstance(params["canvas"], dict)
-            assert isinstance(params["root_position"], dict)
-            assert isinstance(params["boundary"], dict)
-            assert "coords" in params["canvas"]
-            assert "x" in params["root_position"] and "y" in params["root_position"]
-            assert "coords" in params["boundary"]
+            assert isinstance(params["canvas"], str)
+            assert "Canvas" in params["canvas"]
+            assert isinstance(params["root_position"], str)
+            assert "Point" in params["root_position"]
+            assert isinstance(params["boundary"], str)
+            assert "Polygon" in params["boundary"]
 
         # Check config file
         config_path = exp_dir / "config.json"

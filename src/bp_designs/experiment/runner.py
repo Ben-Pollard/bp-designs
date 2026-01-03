@@ -48,14 +48,10 @@ class ExperimentRunner:
         if isinstance(value, (np.ndarray, np.generic)):
             return value.tolist()
 
-        # Handle dataclasses
+        # Handle dataclasses - convert to string representation for readability
         if dataclasses.is_dataclass(value) and not isinstance(value, type):
-            # Convert dataclass to dict, recursively serialize fields
-            result = {}
-            for field in dataclasses.fields(value):
-                field_value = getattr(value, field.name)
-                result[field.name] = ExperimentRunner._serialize_value(field_value)
-            return result
+            # Use string representation for human-readable output
+            return str(value)
 
         # Handle lists and tuples
         if isinstance(value, (list, tuple)):

@@ -560,3 +560,40 @@ class BranchNetwork(Pattern):
             next_branch_id += 1
 
         return branch_ids
+
+    def __str__(self) -> str:
+        """Return human-readable string representation."""
+        num_nodes = len(self.positions) if self.positions is not None else 0
+        return f"BranchNetwork(N={num_nodes})"
+
+    def __eq__(self, other: object) -> bool:
+        """Equality based on data arrays and density_falloff."""
+        if not isinstance(other, BranchNetwork):
+            return False
+        # Compare arrays using np.array_equal
+        if not np.array_equal(self.node_ids, other.node_ids):
+            return False
+        if not np.array_equal(self.positions, other.positions):
+            return False
+        if not np.array_equal(self.parents, other.parents):
+            return False
+        if not np.array_equal(self.timestamps, other.timestamps):
+            return False
+        if self.density_falloff != other.density_falloff:
+            return False
+        return True
+
+    def __hash__(self) -> int:
+        """Hash based on data arrays and density_falloff."""
+        # Convert arrays to tuples for hashing
+        def array_hash(arr):
+            if arr.size == 0:
+                return hash(())
+            return hash(tuple(tuple(map(float, point)) for point in arr.reshape(-1, arr.shape[-1])))
+
+        node_ids_hash = array_hash(self.node_ids)
+        positions_hash = array_hash(self.positions)
+        parents_hash = array_hash(self.parents)
+        timestamps_hash = array_hash(self.timestamps)
+
+        return hash((node_ids_hash, positions_hash, parents_hash, timestamps_hash, self.density_falloff))

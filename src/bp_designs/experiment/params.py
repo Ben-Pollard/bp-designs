@@ -118,13 +118,16 @@ class ParameterGrid:
         ]
 
         for param in self.param_names:
-            values = {combo[param] for combo in self.combinations}
-            if len(values) <= 5:
-                lines.append(f"  {param}: {sorted(values)}")
+            # Use string representations for human-readable summary
+            unique_strings = {str(combo[param]) for combo in self.combinations}
+            num_values = len(unique_strings)
+            if num_values <= 5:
+                sorted_strings = sorted(unique_strings)
+                lines.append(f"  {param}: {sorted_strings}")
             else:
-                sorted_values = sorted(values)
+                sorted_strings = sorted(unique_strings)
                 lines.append(
-                    f"  {param}: {sorted_values[0]} ... {sorted_values[-1]} ({len(values)} values)"
+                    f"  {param}: {sorted_strings[0]} ... {sorted_strings[-1]} ({num_values} values)"
                 )
 
         if self.fixed_params:

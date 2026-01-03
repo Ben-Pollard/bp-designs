@@ -31,7 +31,7 @@ build-backend = "poetry.core.masonry.api"
 
 # Ruff configuration - fast Python linter (replaces flake8, isort, etc.)
 [tool.ruff]
-line-length = 100
+line-length = 110
 
 [tool.ruff.lint]
 select = [

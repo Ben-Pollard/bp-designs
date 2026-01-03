@@ -8,6 +8,7 @@ from shapely.geometry import Polygon as ShapelyPolygon
 from bp_designs.core.directions import DirectionVectors, PairwiseCoordinateVectors
 from bp_designs.core.generator import Generator
 from bp_designs.core.geometry import Canvas, Point, Polygon
+from bp_designs.core.pattern import Pattern
 from bp_designs.patterns.network import BranchNetwork
 
 
@@ -24,8 +25,8 @@ class SpaceColonization(Generator):
         self,
         canvas: Canvas,
         root_position: Point,
-        initial_boundary: Polygon,
-        final_boundary: Polygon,
+        initial_boundary: Pattern,
+        final_boundary: Pattern,
         seed: int = 0,
         num_attractions: int = 500,
         kill_distance: float = 5.0,
@@ -37,8 +38,8 @@ class SpaceColonization(Generator):
         Args:
             canvas: defines the coordinate system
             root_position: Starting position (default: bottom center)
-            initial_boundary: Polygon for initial attraction points
-            final_boundary: Polygon for maximum growth region
+            initial_boundary: Pattern defining region for initial attraction points
+            final_boundary: Pattern defining maximum growth region
             seed: Random seed for determinism
             num_attractions: Number of attraction points (growth targets)
             kill_distance: Distance at which attraction points are removed
@@ -54,9 +55,12 @@ class SpaceColonization(Generator):
         self.canvas = canvas
         # Convert Point to array for positions
         self.root_position_array = np.array([root_position.x, root_position.y], dtype=float)
-        # Store boundaries and iteration limit
-        self.initial_boundary = initial_boundary
-        self.final_boundary = final_boundary
+        # Store boundary patterns
+        self.initial_boundary_pattern = initial_boundary
+        self.final_boundary_pattern = final_boundary
+        # Extract polygons from patterns for internal use
+        self.initial_boundary = initial_boundary.polygon
+        self.final_boundary = final_boundary.polygon
         self.max_iterations = max_iterations
 
     def generate_pattern(self, **kwargs) -> BranchNetwork:

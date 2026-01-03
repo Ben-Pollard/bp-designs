@@ -21,6 +21,13 @@ class Point(Geometry):
     y: int
     z: int | None
 
+    def __str__(self) -> str:
+        """Return concise string representation."""
+        if self.z is None:
+            return f"Point({self.x},{self.y})"
+        else:
+            return f"Point({self.x},{self.y},{self.z})"
+
 
 @dataclass
 class PointSet(Geometry):
@@ -39,6 +46,13 @@ class Polygon(Geometry):
         if self.coords.ndim != 2 or self.coords.shape[1] != 2:
             raise ValueError(f"coords must be (N, 2), got {self.coords.shape}")
 
+    def __str__(self) -> str:
+        """Return concise string representation."""
+        bounds = self.bounds()
+        width = bounds[2] - bounds[0]
+        height = bounds[3] - bounds[1]
+        return f"Polygon({width:.1f}x{height:.1f})"
+
     def bounds(self) -> tuple[float, float, float, float]:
         """Return bounding box (xmin, ymin, xmax, ymax)."""
         if len(self.coords) == 0:
@@ -50,7 +64,29 @@ class Polygon(Geometry):
 
 @dataclass
 class Canvas(Polygon):
-    pass
+
+    def __str__(self) -> str:
+        """Return concise string representation."""
+        bounds = self.bounds()
+        width = bounds[2] - bounds[0]
+        height = bounds[3] - bounds[1]
+        return f"Canvas({width:.0f}x{height:.0f})"
+
+    @classmethod
+    def from_width_height(cls, width: int, height: int):
+        coords = np.array([
+            [0.0, 0.0],
+            [width, 0.0],
+            [width, height],
+            [0.0, height],
+            [0.0, 0.0],  # Close the polygon
+        ])
+        return cls(coords=coords)
+
+    @classmethod
+    def from_size(cls, size: int):
+
+        return cls.from_width_height(size, size)
 
 
 @dataclass

@@ -2,8 +2,8 @@
 
 
 ### Phase 1: Generator detail and composition interface ###
-- [ ] simple 2-d pattern generators: oval, rectangle, polygon.
-- [ ] Integrate updated geometry api to get space colonisation working again
+- [ ] simple 2-d pattern generators: oval, regular polygon.
+- [x] Integrate updated geometry api to get space colonisation working again
   - [ ] While implementing growth: accept initial and maximum bounds as polygons in place of width/height. Restrict attractor generation to intital bounds, expand intitial bounds around current nodes, kill out-of-bounds sources.
 - [ ] Growth: vein size implementation, following original paper
 

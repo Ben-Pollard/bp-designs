@@ -24,6 +24,7 @@ class Pattern(ABC):
 
     A Pattern:
     - Can be rendered to geometry (to_geometry)
+    - Has a string representation for display and identification
 
     Patterns maintain their own internal semantic structures (e.g.,
     BranchNetwork maintains parents, depths, branch_ids as separate arrays).
@@ -33,4 +34,9 @@ class Pattern(ABC):
     @abstractmethod
     def to_geometry(self) -> Polyline:
         """Convert pattern to renderable geometry."""
+        pass
+
+    @abstractmethod
+    def __str__(self) -> str:
+        """Return human-readable string representation of the pattern."""
         pass
