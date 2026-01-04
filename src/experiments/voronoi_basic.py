@@ -19,17 +19,16 @@ def main():
     # Define parameter space
     space = ParameterSpace(
         name="voronoi_basic",
-        ranges={
+        pattern={
             "num_sites": [10, 30, 50, 100],  # 4 values
             "relaxation_iterations": [0, 2, 5],  # 3 values
             "render_mode": ["edges", "cells", "both"],  # 3 values
-        },
-        fixed={
             "seed": 42,  # Same seed for fair comparison
             "width": 100.0,
             "height": 100.0,
             "boundary_margin": 20.0,
         },
+        render={},  # Use runner defaults for SVG rendering
     )
 
     # Generate grid

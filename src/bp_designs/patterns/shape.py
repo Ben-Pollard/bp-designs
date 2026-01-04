@@ -6,6 +6,7 @@ Wraps polygons and other basic shapes as patterns.
 from __future__ import annotations
 
 import numpy as np
+import svgwrite
 
 from bp_designs.core.geometry import Polygon, Polyline
 from bp_designs.core.pattern import Pattern
@@ -72,3 +73,74 @@ class ShapePattern(Pattern):
 
         # Return as a single polyline (closed loop)
         return Polyline(polylines=[coords])
+
+    def to_svg(
+        self,
+        stroke_width: float = 0.5,
+        stroke_color: str = "#000000",
+        fill: str | None = None,
+        stroke_linecap: str = "round",
+        stroke_linejoin: str = "round",
+        width: float = 800,
+        height: float = 600,
+        padding: float = 20,
+        background: str | None = None,
+    ) -> str:
+        """Render shape as SVG.
+
+        Args:
+            stroke_width: Line width in SVG units
+            stroke_color: Stroke color (any valid SVG color)
+            fill: Fill color (or None for no fill)
+            stroke_linecap: SVG linecap style ('round', 'butt', 'square')
+            stroke_linejoin: SVG linejoin style ('round', 'miter', 'bevel')
+            width: SVG canvas width in pixels
+            height: SVG canvas height in pixels
+            padding: Padding around shape in SVG units
+            background: Background color (or None for transparent)
+
+        Returns:
+            SVG string
+        """
+        # Get polygon coordinates, ensure closed
+        coords = self.polygon.coords
+        if len(coords) > 0 and not np.allclose(coords[0], coords[-1]):
+            coords = np.vstack([coords, coords[0:1]])
+
+        # Compute bounds with padding
+        xmin, ymin, xmax, ymax = self.polygon.bounds()
+        xmin -= padding
+        ymin -= padding
+        xmax += padding
+        ymax += padding
+        view_width = xmax - xmin
+        view_height = ymax - ymin
+
+        # Create SVG drawing
+        dwg = svgwrite.Drawing(
+            size=(f"{width}px", f"{height}px"),
+            viewBox=f"{xmin} {ymin} {view_width} {view_height}",
+        )
+
+        # Add background if specified
+        if background is not None:
+            dwg.add(dwg.rect(
+                insert=(xmin, ymin),
+                size=(view_width, view_height),
+                fill=background,
+            ))
+
+        # Convert coordinates to list of tuples
+        points = [(float(x), float(y)) for x, y in coords]
+
+        # Draw polygon
+        dwg.add(dwg.polygon(
+            points=points,
+            stroke=stroke_color,
+            stroke_width=stroke_width,
+            fill=fill if fill is not None else "none",
+            stroke_linecap=stroke_linecap,
+            stroke_linejoin=stroke_linejoin,
+        ))
+
+        return dwg.tostring()

@@ -76,19 +76,20 @@ class TestExperimentRunner:
         # Create a simple parameter space
         space = ParameterSpace(
             name="test_space",
-            ranges={
+            pattern={
                 "param1": [1, 2, 3],
                 "param2": (0.0, 1.0, 3),  # Linear spacing
+                "fixed_param": "constant",
             },
-            fixed={"fixed_param": "constant"},
+            render={},
         )
 
         grid = space.to_grid()
 
         assert grid.space_name == "test_space"
         assert len(grid) == 9  # 3 × 3 combinations
-        assert set(grid.param_names) == {"param1", "param2"}
-        assert grid.fixed_params == {"fixed_param": "constant"}
+        assert set(grid.pattern_param_names) == {"param1", "param2", "fixed_param"}
+        assert grid.render_param_names == []
 
         # Test iteration
         combinations = list(grid)
@@ -129,23 +130,30 @@ class TestExperimentRunner:
 
         space = ParameterSpace(
             name="test_run",
-            ranges={"seed": [1, 2, 3]},
-            fixed={
+            pattern={
+                "seed": [1, 2, 3],
                 "size": 100,
                 "canvas": canvas,
                 "root_position": root_position,
                 "boundary": boundary,
             },
+            render={},
         )
         grid = space.to_grid()
 
-        # Mock generator function that returns geometry
+        # Mock generator function that returns pattern with to_svg method
+        class MockPattern:
+            def __init__(self, points):
+                self.points = points
+            def to_svg(self, **kwargs):
+                return '<svg></svg>'
+
         def mock_generator(params):
-            # Return a simple geometry based on seed
+            # Return a simple pattern based on seed
             seed = params["seed"]
             np.random.seed(seed)
             points = np.random.rand(3, 2) * params["size"]
-            return Polyline(polylines=[points])
+            return MockPattern(points)
 
         runner = experiment_runner_factory(
             experiment_name="test_run",
@@ -211,15 +219,22 @@ class TestExperimentRunner:
         # Create parameter grid
         space = ParameterSpace(
             name="test_failures",
-            ranges={"mode": ["success", "fail"]},
+            pattern={"mode": ["success", "fail"]},
+            render={},
         )
         grid = space.to_grid()
 
         # Mock generator that fails for specific mode
+        class MockPattern:
+            def __init__(self, points):
+                self.points = points
+            def to_svg(self, **kwargs):
+                return '<svg></svg>'
+
         def mock_generator(params):
             if params["mode"] == "fail":
                 raise ValueError("Simulated failure")
-            return Polyline(polylines=[np.array([[0, 0], [10, 10]])])
+            return MockPattern(np.array([[0, 0], [10, 10]]))
 
         runner = experiment_runner_factory(
             experiment_name="test_failures",
@@ -251,31 +266,33 @@ class TestExperimentRunner:
 
         space = ParameterSpace(
             name="test_dict_result",
-            ranges={"value": [1, 2]},
+            pattern={"value": [1, 2]},
+            render={},
         )
         grid = space.to_grid()
 
+        class MockPattern:
+            def __init__(self, points):
+                self.points = points
+            def to_svg(self, **kwargs):
+                return '<svg></svg>'
+
         def mock_generator(params):
             value = params["value"]
-            geometry = Polyline(polylines=[np.array([[0, 0], [value * 10, value * 10]])])
-            return {
-                "geometry": geometry,
-                "metadata": {"computed_value": value * 2},
-                "extra_info": "test",
-            }
+            return MockPattern(np.array([[0, 0], [value * 10, value * 10]]))
 
         runner = experiment_runner_factory(experiment_name="test_dict_result")
 
         _summary = runner.run(grid, mock_generator, max_variants=1)
 
-        # Check that metadata was saved
+        # Check that files were saved
         exp_dir = output_dir / "test_dict_result"
         outputs_dir = exp_dir / "outputs"
         with open(outputs_dir / "var_0001.json") as f:
             metadata = json.load(f)
-            assert metadata["metadata"]["computed_value"] == 2  # 1 * 2
-            assert metadata["extra_info"] == "test"
-            assert "geometry" not in metadata  # Should be excluded
+            assert metadata["variant_id"] == "var_0001"
+            assert metadata["params"]["value"] == 1
+            assert metadata["svg_path"] == "outputs/var_0001.svg"
 
     def test_run_experiment_with_numpy_metadata(
         self, experiment_runner_factory, temp_experiment_dirs
@@ -286,42 +303,55 @@ class TestExperimentRunner:
 
         space = ParameterSpace(
             name="test_numpy_metadata",
-            ranges={"id": [1]},
+            pattern={
+                "id": [1],
+                "array_data": np.array([1, 2, 3]),
+                "scalar_data": np.float64(42.5),
+            },
+            render={},
         )
         grid = space.to_grid()
 
+        class MockPattern:
+            def __init__(self, points):
+                self.points = points
+            def to_svg(self, **kwargs):
+                return '<svg></svg>'
+
         def mock_generator(params):
-            geometry = Polyline(polylines=[np.array([[0, 0], [10, 10]])])
-            return {
-                "geometry": geometry,
-                "array_data": np.array([1, 2, 3]),
-                "scalar_data": np.float64(42.5),
-            }
+            return MockPattern(np.array([[0, 0], [10, 10]]))
 
         runner = experiment_runner_factory(experiment_name="test_numpy_metadata")
 
         _summary = runner.run(grid, mock_generator)
 
-        # Check that numpy arrays were converted to lists
+        # Check that numpy arrays in parameters were converted to lists
         exp_dir = output_dir / "test_numpy_metadata"
         outputs_dir = exp_dir / "outputs"
         with open(outputs_dir / "var_0001.json") as f:
             metadata = json.load(f)
-            assert metadata["array_data"] == [1, 2, 3]
-            assert metadata["scalar_data"] == 42.5
+            params = metadata["params"]
+            assert params["array_data"] == [1, 2, 3]
+            assert params["scalar_data"] == 42.5
 
     @patch.object(ExperimentRunner, "_update_experiments_index")
     def test_experiment_index_update(self, mock_update_index, experiment_runner_factory):
         """Test that experiments index is updated."""
-        space = ParameterSpace(name="test_index", ranges={"x": [1]})
+        space = ParameterSpace(name="test_index", pattern={"x": [1]}, render={})
         grid = space.to_grid()
 
         runner = experiment_runner_factory(
             experiment_name="test_index",
         )
 
+        class MockPattern:
+            def __init__(self, points):
+                self.points = points
+            def to_svg(self, **kwargs):
+                return '<svg></svg>'
+
         def mock_generator(params):
-            return Polyline(polylines=[np.array([[0, 0], [10, 10]])])
+            return MockPattern(np.array([[0, 0], [10, 10]]))
 
         summary = runner.run(grid, mock_generator)
 
@@ -339,16 +369,23 @@ class TestExperimentRunner:
 
         space = ParameterSpace(
             name="test_max_variants",
-            ranges={"x": list(range(10))},  # 10 values
+            pattern={"x": list(range(10))},  # 10 values
+            render={},
         )
         grid = space.to_grid()
 
         call_count = 0
 
+        class MockPattern:
+            def __init__(self, points):
+                self.points = points
+            def to_svg(self, **kwargs):
+                return '<svg></svg>'
+
         def mock_generator(params):
             nonlocal call_count
             call_count += 1
-            return Polyline(polylines=[np.array([[0, 0], [10, 10]])])
+            return MockPattern(np.array([[0, 0], [10, 10]]))
 
         runner = experiment_runner_factory(experiment_name="test_max_variants")
 
@@ -368,17 +405,23 @@ class TestExperimentRunner:
     def test_empty_parameter_grid(self, experiment_runner_factory):
         """Test handling of empty parameter grid."""
         # Create empty parameter space
-        space = ParameterSpace(name="test_empty", ranges={})
+        space = ParameterSpace(name="test_empty", pattern={}, render={})
         grid = space.to_grid()
 
-        # Empty ranges produce one combination (empty parameter set)
+        # Empty pattern produces one combination (empty parameter set)
         assert len(grid) == 1
         assert list(grid) == [{}]
 
         runner = experiment_runner_factory(experiment_name="test_empty")
 
+        class MockPattern:
+            def __init__(self, points):
+                self.points = points
+            def to_svg(self, **kwargs):
+                return '<svg></svg>'
+
         def mock_generator(params):
-            return Polyline(polylines=[np.array([[0, 0], [10, 10]])])
+            return MockPattern(np.array([[0, 0], [10, 10]]))
 
         # Should generate one variant with empty params
         summary = runner.run(grid, mock_generator)
@@ -389,7 +432,7 @@ class TestExperimentRunner:
 
     def test_generator_returns_non_geometry(self, experiment_runner_factory):
         """Test error when generator doesn't return geometry."""
-        space = ParameterSpace(name="test_bad_return", ranges={"x": [1]})
+        space = ParameterSpace(name="test_bad_return", pattern={"x": [1]}, render={})
         grid = space.to_grid()
 
         runner = experiment_runner_factory(experiment_name="test_bad_return")

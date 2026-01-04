@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
-from scipy.spatial import KDTree
+import svgwrite
 
 from bp_designs.core.geometry import Polyline
 from bp_designs.core.pattern import Pattern
@@ -68,13 +68,7 @@ class BranchNetwork(Pattern):
 
     timestamps: np.ndarray  # (N,) - Growth order (iteration when added)
 
-    # Field query configuration
 
-    density_falloff: float = 10.0  # Exponential falloff distance for density field
-
-    # Cached spatial index for fast field queries (lazy initialization)
-
-    _kdtree: KDTree | None = field(default=None, init=False, repr=False, compare=False)
 
     def __post_init__(self):
         """Validate structure."""
@@ -92,128 +86,7 @@ class BranchNetwork(Pattern):
 
     # ============================================================================
 
-    @property
-    def kdtree(self) -> KDTree:
-        """Lazy-initialized spatial index for fast field queries.
 
-
-
-        KDTree enables O(log N) nearest neighbor queries instead of O(N).
-
-
-        Built only when first field query is made.
-        """
-
-        if self._kdtree is None:
-            self._kdtree = KDTree(self.positions)
-
-        return self._kdtree
-
-    def sample_field(self, points: np.ndarray, channel: str) -> np.ndarray:
-        """Sample branch network as a field (vectorized).
-
-
-
-        Uses cached KDTree for O(log N) nearest neighbor queries.
-
-
-        All operations are vectorized (no Python loops).
-
-
-
-        Args:
-
-
-            points: (N, 2) array of query positions
-
-
-            channel: One of: 'distance', 'depth', 'branch_id', 'density', 'direction'
-
-
-
-        Returns:
-
-
-            (N,) array for scalar channels, (N, 2) for 'direction'
-
-
-
-        Raises:
-
-
-            ValueError: If channel is unknown
-        """
-
-        if channel == "distance":
-            # Distance to nearest branch node
-
-            distances, _ = self.kdtree.query(points)
-            return distances
-
-        elif channel == "depth":
-            # Interpolate hierarchy depth from nearest node
-
-            _, indices = self.kdtree.query(points)
-
-            return self.depths[indices].astype(float)
-
-        elif channel == "branch_id":
-            # Which branch is nearest
-
-            _, indices = self.kdtree.query(points)
-
-            return self.branch_ids[indices].astype(float)
-
-        elif channel == "density":
-            # Branch density with exponential falloff
-
-            distances, _ = self.kdtree.query(points)
-
-            return np.exp(-distances / self.density_falloff)
-
-        elif channel == "direction":
-            # Growth direction at nearest point (unit vector)
-
-            _, indices = self.kdtree.query(points)
-
-            # Compute direction from parent to node
-
-            parent_idx = self.parents[indices]
-
-            # Handle roots (parent = -1)
-
-            mask = parent_idx >= 0
-
-            directions = np.zeros((len(points), 2))
-
-            if mask.any():
-                directions[mask] = self.positions[indices[mask]] - self.positions[parent_idx[mask]]
-
-                # Normalize
-
-                norms = np.linalg.norm(directions[mask], axis=1, keepdims=True)
-
-                norms = np.maximum(norms, 1e-10)  # Avoid division by zero
-
-                directions[mask] /= norms
-
-            return directions
-
-        else:
-            raise ValueError(
-                f"Unknown channel '{channel}'. Available: {list(self.available_channels().keys())}"
-            )
-
-    def available_channels(self) -> dict[str, str]:
-        """Return available field channels with descriptions."""
-
-        return {
-            "distance": "Distance to nearest branch node",
-            "depth": "Hierarchy depth from root (interpolated from nearest node)",
-            "branch_id": "ID of nearest branch",
-            "density": f"Branch density (exp(-d/{self.density_falloff}))",
-            "direction": "Growth direction (unit vector, returns (N,2) array)",
-        }
 
     def to_geometry(self) -> Polyline:
         """Convert to polyline representation for export.
@@ -272,6 +145,138 @@ class BranchNetwork(Pattern):
         xmax, ymax = self.positions.max(axis=0)
 
         return (float(xmin), float(ymin), float(xmax), float(ymax))
+
+    def _compute_thickness_values(
+        self,
+        thickness: str = 'descendant',
+        min_thickness: float = 0.5,
+        max_thickness: float = 5.0,
+        taper_power: float = 0.5,
+    ) -> np.ndarray:
+        """Compute thickness for each node based on strategy.
+        Args:
+            thickness: Strategy name ('timestamp', 'hierarchy', 'descendant')
+            min_thickness: Minimum thickness value
+            max_thickness: Maximum thickness value
+            taper_power: Power law exponent for descendant mode
+
+        Returns:
+            (N,) array of thickness values for each node
+        """
+        if thickness == 'timestamp':
+            strategy = TimestampThickness(min_thickness, max_thickness)
+        elif thickness == 'hierarchy':
+            strategy = HierarchyThickness(min_thickness, max_thickness)
+        elif thickness == 'descendant':
+            strategy = DescendantThickness(min_thickness, max_thickness, taper_power)
+        else:
+            raise ValueError(f"Unknown thickness strategy: {thickness}")
+
+        return strategy.compute_thickness(self)
+
+    def to_svg(
+        self,
+        thickness: str = 'descendant',
+        min_thickness: float = 0.5,
+        max_thickness: float = 5.0,
+        taper_power: float = 0.5,
+        taper_style: str = 'smooth',  # 'smooth' or 'blocky'
+        color: str = 'black',
+        stroke_linecap: str = 'round',
+        stroke_linejoin: str = 'round',
+        width: float = 800,
+        height: float = 600,
+        padding: float = 20,
+        **kwargs
+    ) -> str:
+        """Render branch network to SVG with semantic thickness.
+
+        Args:
+            thickness: Thickness strategy ('timestamp', 'hierarchy', 'descendant')
+            min_thickness: Minimum branch thickness
+            max_thickness: Maximum branch thickness
+            taper_power: Power law for descendant thickness
+            taper_style: 'smooth' for interpolated or 'blocky' for per-segment
+            color: Stroke color
+            stroke_linecap: SVG linecap style ('round', 'butt', 'square')
+            stroke_linejoin: SVG linejoin style ('round', 'miter', 'bevel')
+            width: SVG canvas width
+            height: SVG canvas height
+            padding: Padding around content
+            **kwargs: Additional SVG attributes
+
+        Returns:
+            SVG string
+        """
+
+
+        # Compute thickness for all nodes
+        node_thickness = self._compute_thickness_values(
+            thickness, min_thickness, max_thickness, taper_power
+        )
+
+        # Add root thickness (same as first child or max)
+        root_thickness = max_thickness if len(node_thickness) == 0 else node_thickness[0]
+        all_thickness = np.concatenate([[root_thickness], node_thickness])
+
+        # Compute view box from bounds
+        xmin, ymin, xmax, ymax = self.bounds()
+
+        # Add padding
+        xmin -= padding
+        ymin -= padding
+        xmax += padding
+        ymax += padding
+
+        view_width = xmax - xmin
+        view_height = ymax - ymin
+
+        # Create SVG
+        dwg = svgwrite.Drawing(
+            size=(f'{width}px', f'{height}px'),
+            viewBox=f'{xmin} {ymin} {view_width} {view_height}',
+            **kwargs
+        )
+
+
+        # Smooth tapering: use path with varying stroke-width via opacity hack
+        # Actually, SVG doesn't support varying stroke width along a path natively
+        # So we render each segment separately with interpolated thickness
+
+        for i in range(len(self.node_ids)):
+            parent_idx = self.parents[i]
+            if parent_idx == -1:
+                continue
+
+            # Get positions
+            start = self.positions[parent_idx]
+            end = self.positions[i]
+
+            # Get thickness at both ends
+            t_start = all_thickness[parent_idx]
+            t_end = all_thickness[i]
+
+            if taper_style == 'smooth':
+                # Use average thickness for this segment
+                t = (t_start + t_end) / 2
+            elif taper_style == 'blocky':
+                t = all_thickness[i]
+            else:
+                raise ValueError(f"Unknown taper_style: {taper_style}")
+
+            # Draw line segment
+            line = dwg.line(
+                start=(float(start[0]), float(start[1])),
+                end=(float(end[0]), float(end[1])),
+                stroke=color,
+                stroke_width=t,
+                stroke_linecap=stroke_linecap,
+                stroke_linejoin=stroke_linejoin,
+            )
+            dwg.add(line)
+
+
+        return dwg.tostring()
 
     # ============================================================================
 
@@ -385,8 +390,7 @@ class BranchNetwork(Pattern):
             node_ids=self.node_ids[selection],
             positions=self.positions[selection],
             parents=self.parents[selection],
-            timestamps=self.timestamps[selection],
-            density_falloff=self.density_falloff,
+            timestamps=self.timestamps[selection]
         )
 
     def taper_weights(self, base_width: float = 1.0, taper_rate: float = 0.8) -> np.ndarray:
@@ -416,81 +420,7 @@ class BranchNetwork(Pattern):
 
         return base_width * (taper_rate**self.depths)
 
-    # @classmethod
 
-    # def from_node_list(cls, nodes: list[dict], compute_branches: bool = True) -> BranchNetwork:
-
-    #     """Convert list-of-dicts representation to vectorized structure.
-
-    #     Useful for converting from legacy implementation or simple builders.
-
-    #     Args:
-
-    #         nodes: List of {"pos": np.array, "parent": int, "timestamp": int}
-
-    #         compute_branches: If True, compute branch IDs by tracing to leaves
-
-    #     Returns:
-
-    #         BranchNetwork instance
-
-    #     """
-
-    #     n = len(nodes)
-
-    #     # Extract arrays
-
-    #     positions = np.array([node["pos"] for node in nodes])
-
-    #     parents = np.array([node.get("parent", -1) for node in nodes], dtype=int)
-
-    #     timestamps = np.array([node.get("timestamp", i) for i, node in enumerate(nodes)])
-
-    #     # Compute depths
-
-    #     depths = np.zeros(n, dtype=int)
-
-    #     for i in range(n):
-
-    #         depth = 0
-
-    #         current = i
-
-    #         while parents[current] != -1:
-
-    #             depth += 1
-
-    #             current = parents[current]
-
-    #             if depth > n:  # Cycle detection
-
-    #                 raise ValueError(f"Cycle detected at node {i}")
-
-    #         depths[i] = depth
-
-    #     # Compute branch IDs if requested
-
-    #     if compute_branches:
-
-    #         branch_ids = cls._compute_branch_ids(parents)
-
-    #     else:
-
-    #         branch_ids = np.zeros(n, dtype=int)
-
-    #     return cls(
-
-    #         positions=positions,
-
-    #         parents=parents,
-
-    #         depths=depths,
-
-    #         branch_ids=branch_ids,
-
-    #         timestamps=timestamps,
-
-    #     )
 
     @staticmethod
     def _compute_depths(parents) -> np.ndarray:
@@ -567,7 +497,7 @@ class BranchNetwork(Pattern):
         return f"BranchNetwork(N={num_nodes})"
 
     def __eq__(self, other: object) -> bool:
-        """Equality based on data arrays and density_falloff."""
+        """Equality based on data arrays."""
         if not isinstance(other, BranchNetwork):
             return False
         # Compare arrays using np.array_equal
@@ -579,12 +509,10 @@ class BranchNetwork(Pattern):
             return False
         if not np.array_equal(self.timestamps, other.timestamps):
             return False
-        if self.density_falloff != other.density_falloff:
-            return False
         return True
 
     def __hash__(self) -> int:
-        """Hash based on data arrays and density_falloff."""
+        """Hash based on data arrays."""
         # Convert arrays to tuples for hashing
         def array_hash(arr):
             if arr.size == 0:
@@ -596,4 +524,120 @@ class BranchNetwork(Pattern):
         parents_hash = array_hash(self.parents)
         timestamps_hash = array_hash(self.timestamps)
 
-        return hash((node_ids_hash, positions_hash, parents_hash, timestamps_hash, self.density_falloff))
+        return hash((node_ids_hash, positions_hash, parents_hash, timestamps_hash))
+
+
+class BranchThicknessStrategy:
+    """Base class for computing branch thickness from network structure."""
+
+    def compute_thickness(self, network: BranchNetwork) -> np.ndarray:
+        """Compute thickness value for each edge in the network.
+
+        Args:
+            network: BranchNetwork with semantic information
+
+        Returns:
+            (N,) array of thickness values for each node (excluding root)
+        """
+        raise NotImplementedError
+
+
+class TimestampThickness(BranchThicknessStrategy):
+    """Thickness based on node age/timestamp - older branches are thicker."""
+
+    def __init__(self, min_thickness: float = 0.5, max_thickness: float = 5.0):
+        self.min_thickness = min_thickness
+        self.max_thickness = max_thickness
+
+    def compute_thickness(self, network: BranchNetwork) -> np.ndarray:
+        """Compute thickness based on inverse timestamp (older = thicker)."""
+        # Exclude root node (has no parent edge)
+        node_timestamps = network.timestamps[1:]  # Skip root
+
+        max_time = network.timestamps.max()
+        # Invert so older nodes (lower timestamp) get higher values
+        if max_time > 0:
+            age_normalized = (max_time - node_timestamps) / max_time
+        else:
+            age_normalized = np.zeros_like(node_timestamps)
+
+        thickness = self.min_thickness + age_normalized * (self.max_thickness - self.min_thickness)
+        return thickness
+
+
+class HierarchyThickness(BranchThicknessStrategy):
+    """Thickness based on distance from root - deeper branches are thinner."""
+
+    def __init__(self, min_thickness: float = 0.5, max_thickness: float = 5.0):
+        self.min_thickness = min_thickness
+        self.max_thickness = max_thickness
+
+    def compute_thickness(self, network: BranchNetwork) -> np.ndarray:
+        """Compute thickness based on hierarchical depth from root."""
+        # Compute depth for each node
+        depths = np.zeros(len(network.node_ids), dtype=int)
+
+        for i, parent_id in enumerate(network.parents):
+            if parent_id == -1:  # Root
+                depths[i] = 0
+            else:
+                parent_idx = np.where(network.node_ids == parent_id)[0][0]
+                depths[i] = depths[parent_idx] + 1
+
+        # Exclude root
+        node_depths = depths[1:]
+        max_depth = node_depths.max() if len(node_depths) > 0 else 1
+
+        # Normalize and invert (shallow = thick)
+        if max_depth > 0:
+            depth_normalized = 1.0 - (node_depths / max_depth)
+        else:
+            depth_normalized = np.ones_like(node_depths, dtype=float)
+
+        thickness = self.min_thickness + depth_normalized * (self.max_thickness - self.min_thickness)
+        return thickness
+
+
+class DescendantThickness(BranchThicknessStrategy):
+    """Thickness based on number of terminal descendants - flow-based approach."""
+
+    def __init__(self, min_thickness: float = 0.5, max_thickness: float = 5.0, power: float = 0.5):
+        self.min_thickness = min_thickness
+        self.max_thickness = max_thickness
+        self.power = power  # For tapering curve (< 1 = gentle taper, > 1 = aggressive taper)
+
+    def compute_thickness(self, network: BranchNetwork) -> np.ndarray:
+        """Compute thickness based on downstream terminal count."""
+        num_nodes = len(network.node_ids)
+
+        # Count descendants for each node
+        descendant_counts = np.zeros(num_nodes, dtype=int)
+
+        # Find terminal nodes (no children)
+        is_parent = np.isin(network.node_ids, network.parents[network.parents >= 0])
+        terminal_mask = ~is_parent
+
+        # Each terminal node counts as 1 for itself
+        descendant_counts[terminal_mask] = 1
+
+        # Propagate counts up the tree (work backwards through timestamps)
+        sorted_indices = np.argsort(network.timestamps)[::-1]  # Newest to oldest
+
+        for idx in sorted_indices:
+            parent_id = network.parents[idx]
+            if parent_id >= 0:  # Not root
+                parent_idx = np.where(network.node_ids == parent_id)[0][0]
+                descendant_counts[parent_idx] += descendant_counts[idx]
+
+        # Exclude root for edge thickness
+        node_counts = descendant_counts[1:]
+        max_count = node_counts.max() if len(node_counts) > 0 else 1
+
+        # Normalize with power law for tapering
+        if max_count > 0:
+             count_normalized = (node_counts / max_count) ** self.power
+        else:
+            count_normalized = np.zeros_like(node_counts, dtype=float)
+
+        thickness = self.min_thickness + count_normalized * (self.max_thickness - self.min_thickness)
+        return thickness

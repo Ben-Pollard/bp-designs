@@ -37,6 +37,10 @@ class Pattern(ABC):
         pass
 
     @abstractmethod
+    def to_svg(self) -> str:
+        pass
+
+    @abstractmethod
     def __str__(self) -> str:
         """Return human-readable string representation of the pattern."""
         pass

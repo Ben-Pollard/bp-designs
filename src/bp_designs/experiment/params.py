@@ -11,29 +11,36 @@ import numpy as np
 
 @dataclass
 class ParameterSpace:
-    """Define parameter ranges for experimentation.
+    """Define parameter spaces for pattern generation and rendering.
 
     Supports multiple sampling strategies:
     - Linear spacing (linspace)
     - Logarithmic spacing (logspace)
     - Explicit value lists
+
+    Parameters are categorized as pattern (for pattern generation) or
+    render (for SVG rendering). Each category is a dict mapping parameter
+    names to specifications:
+    - List of explicit values [v1, v2, ...]
+    - Tuple (min, max, steps) for linear spacing
+    - Single value for fixed parameter
     """
 
     name: str
-    ranges: dict[str, list[Any] | tuple[float, float, int]]
-    fixed: dict[str, Any] | None = None
+    pattern: dict[str, Any]
+    render: dict[str, Any]
 
     def __post_init__(self):
-        """Initialize fixed parameters if not provided."""
-        if self.fixed is None:
-            self.fixed = {}
+        """Validate parameter specifications."""
+        pass
 
-    def expand_range(self, param_name: str, spec: Any) -> list[Any]:
+    def expand_spec(self, param_name: str, spec: Any) -> list[Any]:
         """Expand a parameter specification into a list of values.
 
         Args:
             param_name: Parameter name (for error messages)
-            spec: Either a list of explicit values or tuple (min, max, steps)
+            spec: Either a list of explicit values, tuple (min, max, steps),
+                  or a single value (treated as fixed)
 
         Returns:
             List of parameter values to test
@@ -45,10 +52,8 @@ class ParameterSpace:
             # (min, max, steps) - linear spacing
             return list(np.linspace(spec[0], spec[1], spec[2]))
         else:
-            raise ValueError(
-                f"Invalid parameter spec for '{param_name}': {spec}. "
-                "Expected list [v1, v2, ...] or tuple (min, max, steps)"
-            )
+            # Single value - treat as fixed parameter with one value
+            return [spec]
 
     def to_grid(self) -> ParameterGrid:
         """Generate all parameter combinations as a grid.
@@ -56,26 +61,41 @@ class ParameterSpace:
         Returns:
             ParameterGrid with all combinations
         """
-        # Expand all ranges
-        expanded = {}
-        for param_name, spec in self.ranges.items():
-            expanded[param_name] = self.expand_range(param_name, spec)
+        # Expand pattern parameters
+        expanded_pattern = {}
+        for param_name, spec in self.pattern.items():
+            expanded_pattern[param_name] = self.expand_spec(param_name, spec)
 
-        # Generate cartesian product
-        param_names = list(expanded.keys())
-        param_values = [expanded[name] for name in param_names]
+        # Expand render parameters
+        expanded_render = {}
+        for param_name, spec in self.render.items():
+            expanded_render[param_name] = self.expand_spec(param_name, spec)
 
+        # Generate pattern combinations
+        pattern_names = list(expanded_pattern.keys())
+        pattern_values = [expanded_pattern[name] for name in pattern_names]
+        pattern_combinations = []
+        for values in product(*pattern_values):
+            pattern_combinations.append(dict(zip(pattern_names, values, strict=False)))
+
+        # Generate render combinations
+        render_names = list(expanded_render.keys())
+        render_values = [expanded_render[name] for name in render_names]
+        render_combinations = []
+        for values in product(*render_values):
+            render_combinations.append(dict(zip(render_names, values, strict=False)))
+
+        # Cross product: combine each pattern combo with each render combo
         combinations = []
-        for values in product(*param_values):
-            combo = dict(zip(param_names, values, strict=False))
-            # Add fixed parameters
-            combo.update(self.fixed)
-            combinations.append(combo)
+        for pattern_combo in pattern_combinations:
+            for render_combo in render_combinations:
+                combo = {**pattern_combo, **render_combo}
+                combinations.append(combo)
 
         return ParameterGrid(
             space_name=self.name,
-            param_names=param_names,
-            fixed_params=self.fixed,
+            pattern_param_names=pattern_names,
+            render_param_names=render_names,
             combinations=combinations,
         )
 
@@ -88,8 +108,8 @@ class ParameterGrid:
     """
 
     space_name: str
-    param_names: list[str]
-    fixed_params: dict[str, Any]
+    pattern_param_names: list[str]
+    render_param_names: list[str]
     combinations: list[dict[str, Any]]
 
     def __len__(self) -> int:
@@ -113,27 +133,51 @@ class ParameterGrid:
         lines = [
             f"Parameter Grid: {self.space_name}",
             f"Combinations: {len(self.combinations)}",
-            "",
-            "Variable parameters:",
         ]
 
-        for param in self.param_names:
-            # Use string representations for human-readable summary
-            unique_strings = {str(combo[param]) for combo in self.combinations}
-            num_values = len(unique_strings)
-            if num_values <= 5:
-                sorted_strings = sorted(unique_strings)
-                lines.append(f"  {param}: {sorted_strings}")
-            else:
-                sorted_strings = sorted(unique_strings)
-                lines.append(
-                    f"  {param}: {sorted_strings[0]} ... {sorted_strings[-1]} ({num_values} values)"
-                )
+        # Combine all parameter names
+        all_param_names = self.pattern_param_names + self.render_param_names
 
-        if self.fixed_params:
+        # Separate variable and fixed parameters
+        variable_params = []
+        fixed_params = []
+
+        for param in all_param_names:
+            # Get string representations for uniqueness check (handles unhashable types)
+            unique_strings = {str(combo[param]) for combo in self.combinations}
+            if len(unique_strings) == 1:
+                # All values have same string representation, treat as fixed
+                fixed_params.append((param, self.combinations[0][param]))
+            else:
+                # Variable parameter - store unique values as strings for display
+                variable_params.append((param, unique_strings))
+
+        if variable_params:
+            lines.append("")
+            lines.append("Variable parameters:")
+            for param, values in variable_params:
+                unique_strings = {str(v) for v in values}
+                num_values = len(unique_strings)
+                if num_values <= 5:
+                    sorted_strings = sorted(unique_strings)
+                    lines.append(f"  {param}: {sorted_strings}")
+                else:
+                    sorted_strings = sorted(unique_strings)
+                    lines.append(
+                        f"  {param}: {sorted_strings[0]} ... {sorted_strings[-1]} ({num_values} values)"
+                    )
+
+        if fixed_params:
             lines.append("")
             lines.append("Fixed parameters:")
-            for param, value in self.fixed_params.items():
+            for param, value in fixed_params:
                 lines.append(f"  {param}: {value}")
+
+        # Add section headers for pattern vs render if needed
+        if self.pattern_param_names and self.render_param_names:
+            lines.append("")
+            lines.append("Parameter categories:")
+            lines.append(f"  Pattern parameters: {len(self.pattern_param_names)}")
+            lines.append(f"  Render parameters: {len(self.render_param_names)}")
 
         return "\n".join(lines)

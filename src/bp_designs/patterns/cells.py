@@ -133,6 +133,95 @@ class Cells(Pattern):
 
         return Polyline(polylines=polylines)
 
+    def to_svg(
+        self,
+        stroke_width: float = 0.5,
+        stroke_color: str = "#000000",
+        fill: str | None = None,
+        stroke_linecap: str = "round",
+        stroke_linejoin: str = "round",
+        width: float = 800,
+        height: float = 600,
+        padding: float = 20,
+        background: str | None = None,
+    ) -> str:
+        """Render Voronoi cells as SVG.
+
+        Args:
+            stroke_width: Line width in SVG units
+            stroke_color: Stroke color (any valid SVG color)
+            fill: Fill color (or None for no fill)
+            stroke_linecap: SVG linecap style ('round', 'butt', 'square')
+            stroke_linejoin: SVG linejoin style ('round', 'miter', 'bevel')
+            width: SVG canvas width in pixels
+            height: SVG canvas height in pixels
+            padding: Padding around shape in SVG units
+            background: Background color (or None for transparent)
+
+        Returns:
+            SVG string
+        """
+        import svgwrite
+
+        # Get geometry polylines
+        geometry = self.to_geometry()
+
+        # Compute bounds with padding
+        xmin, ymin, xmax, ymax = self.bounds()
+        xmin -= padding
+        ymin -= padding
+        xmax += padding
+        ymax += padding
+        view_width = xmax - xmin
+        view_height = ymax - ymin
+
+        # Create SVG drawing
+        dwg = svgwrite.Drawing(
+            size=(f"{width}px", f"{height}px"),
+            viewBox=f"{xmin} {ymin} {view_width} {view_height}",
+        )
+
+        # Add background if specified
+        if background is not None:
+            dwg.add(dwg.rect(
+                insert=(xmin, ymin),
+                size=(view_width, view_height),
+                fill=background,
+            ))
+
+        # Draw each polyline
+        for polyline in geometry.polylines:
+            if len(polyline) < 2:
+                continue
+
+            # Convert to list of (x, y) tuples
+            points = [(float(x), float(y)) for x, y in polyline]
+
+            if len(polyline) == 2:
+                # Edge - draw as line
+                line = dwg.line(
+                    start=points[0],
+                    end=points[1],
+                    stroke=stroke_color,
+                    stroke_width=stroke_width,
+                    stroke_linecap=stroke_linecap,
+                    fill="none",
+                )
+                dwg.add(line)
+            else:
+                # Cell polygon - draw as polygon
+                poly = dwg.polygon(
+                    points=points,
+                    stroke=stroke_color,
+                    stroke_width=stroke_width,
+                    stroke_linecap=stroke_linecap,
+                    stroke_linejoin=stroke_linejoin,
+                    fill=fill if fill is not None else "none",
+                )
+                dwg.add(poly)
+
+        return dwg.tostring()
+
     def bounds(self) -> tuple[float, float, float, float]:
         """Return pattern bounds."""
 

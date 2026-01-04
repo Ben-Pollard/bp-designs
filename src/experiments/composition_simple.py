@@ -62,18 +62,17 @@ def main():
     # Define parameter space
     space = ParameterSpace(
         name="composition_simple",
-        ranges={
+        pattern={
             "seed": [42, 123, 456],  # 3 seeds for variety
             "num_attractions": [500],  # Just one value
             "num_sites": [30],  # Just one value
-        },
-        fixed={
             "distance_threshold": 8.0,
             "attraction_distance": 50.0,
             "segment_length": 2.0,
             "relaxation_iterations": 2,
             "render_mode": "edges",
         },
+        render={},  # Use runner defaults for SVG rendering
     )
 
     # Generate grid

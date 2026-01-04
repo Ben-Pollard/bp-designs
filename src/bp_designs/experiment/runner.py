@@ -179,53 +179,40 @@ class ExperimentRunner:
             print(f"[{i + 1}/{num_variants}] Generating {variant_id}...", end=" ")
 
             try:
-                # Generate pattern
+                # Separate pattern and render parameters
+                pattern_params = {}
+                render_params = {}
+                for key, value in params.items():
+                    if key in grid.pattern_param_names:
+                        pattern_params[key] = value
+                    elif key in grid.render_param_names:
+                        render_params[key] = value
+                    else:
+                        # Should not happen, but keep as pattern param for safety
+                        pattern_params[key] = value
 
-                result = generator_fn(params)
+                # Generate pattern with pattern parameters only
+                result = generator_fn(pattern_params)
 
-                # Extract geometry from result (can be dict or direct geometry)
+                # Determine SVG size (use render params if provided, otherwise runner defaults)
+                svg_width = render_params.get('width', self.svg_width)
+                svg_height = render_params.get('height', self.svg_height)
 
-                if isinstance(result, dict) and "geometry" in result:
-                    geometry = result["geometry"]
-
-                    metadata_result = result
-
-                else:
-                    geometry = result
-
-                    metadata_result = {}
-
-                # Save SVG
-
+                # Save SVG with render parameters
                 svg_path = self.outputs_dir / f"{variant_id}.svg"
-
-                svg_string = geometry.to_svg(
-                    width=self.svg_width,
-                    height=self.svg_height,
-                    stroke_width=self.stroke_width,
-                )
-
+                svg_string = result.to_svg(**render_params)
                 svg_path.write_text(svg_string)
 
                 # Save metadata
-
                 metadata = {
                     "variant_id": variant_id,
                     "params": self._serialize_value(params),
                     "svg_path": f"outputs/{variant_id}.svg",
-                    "svg_size": {"width": self.svg_width, "height": self.svg_height},
-                    "stroke_width": self.stroke_width,
+                    "svg_size": {"width": svg_width, "height": svg_height},
+                    "stroke_width": render_params.get('stroke_width', self.stroke_width),
                 }
 
-                # Add serializable metadata from generator result
-
-                for key, value in metadata_result.items():
-                    if key != "geometry":  # Skip geometry since it's already used
-                        # Serialize value using our helper
-                        metadata[key] = self._serialize_value(value)
-
                 metadata_path = self.outputs_dir / f"{variant_id}.json"
-
                 metadata_path.write_text(json.dumps(metadata, indent=2))
 
                 print("✓")

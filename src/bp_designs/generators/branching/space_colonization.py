@@ -31,6 +31,7 @@ class SpaceColonization(Generator):
         num_attractions: int = 500,
         kill_distance: float = 5.0,
         segment_length: float = 2.0,
+        boundary_expansion: float = 10.0,
         max_iterations: int = 1000,
     ):
         """Initialize Space Colonization generator.
@@ -44,6 +45,7 @@ class SpaceColonization(Generator):
             num_attractions: Number of attraction points (growth targets)
             kill_distance: Distance at which attraction points are removed
             segment_length: Length of each growth segment
+            boundary_expansion: Buffer distance for organic boundary growth
             max_iterations: Maximum number of growth iterations
         """
         self.rng = np.random.default_rng(seed)
@@ -51,6 +53,7 @@ class SpaceColonization(Generator):
         self.num_attractions = num_attractions
         self.kill_distance = kill_distance
         self.segment_length = segment_length
+        self.boundary_expansion = boundary_expansion
         self.root_position = root_position
         self.canvas = canvas
         # Convert Point to array for positions
@@ -78,10 +81,10 @@ class SpaceColonization(Generator):
         initial_timestamp = 0
         network_previous = self._initialize_network(initial_timestamp)
 
-        attractions = self._initialize_attractions(0, self.initial_boundary)
+        attractions = self._initialize_attractions(self.num_attractions, self.initial_boundary)
 
         for _ in range(self.max_iterations):
-            network, attractions = self._iterate(network_previous, attractions, self.final_boundary)
+            network, attractions = self._iterate(network_previous, attractions)
             if len(attractions) == 0:
                 break
             if network.num_nodes == network_previous.num_nodes:
@@ -149,6 +152,53 @@ class SpaceColonization(Generator):
 
         return np.array(points[:num_attractions])
 
+    def _compute_current_boundary(self, network: BranchNetwork) -> Polygon:
+        """Compute organic boundary based on current network extent.
+
+        Creates convex hull around nodes and buffers by expansion distance,
+        clipped to final boundary.
+
+        Args:
+            network: Current branch network
+
+        Returns:
+            Polygon defining current growth boundary
+        """
+        # Create shapely points from network positions
+        points = [ShapelyPoint(pos) for pos in network.positions]
+
+        # Compute convex hull of all nodes
+        from shapely.geometry import MultiPoint
+        hull = MultiPoint(points).convex_hull
+
+        # Buffer by expansion distance
+        expanded = hull.buffer(self.boundary_expansion)
+
+        # Clip to final boundary
+        final_shapely = ShapelyPolygon(self.final_boundary.coords)
+        clipped = expanded.intersection(final_shapely)
+
+        # Convert back to our Polygon type
+        if clipped.is_empty:
+            # Fallback to final boundary if intersection fails
+            return self.final_boundary
+
+        # Handle MultiPolygon by taking convex hull
+        if clipped.geom_type == 'MultiPolygon':
+            clipped = clipped.convex_hull
+            # After convex hull, may still be Point/LineString if degenerate
+            if clipped.is_empty:
+                return self.final_boundary
+
+        # Extract coordinates from shapely polygon (handles Polygon only)
+        try:
+            coords = np.array(clipped.exterior.coords)
+            return Polygon(coords=coords)
+        except AttributeError:
+            # clipped is not a Polygon (e.g., Point, LineString, GeometryCollection)
+            # Fallback to final boundary
+            return self.final_boundary
+
     def _attraction_vectors(
         self, network: BranchNetwork, attractions: np.ndarray
     ) -> PairwiseCoordinateVectors:
@@ -177,7 +227,7 @@ class SpaceColonization(Generator):
             attraction_vectors: PairwiseCoordinateVectors representing attractions
 
         Returns:
-            (2, N) array of growth vectors for each node
+            DirectionVectors for each node
         """
         if attraction_vectors.empty:
             return DirectionVectors(
@@ -206,13 +256,12 @@ class SpaceColonization(Generator):
         self,
         network: BranchNetwork,
         attractions: np.ndarray,
-        final_boundary: Polygon,
     ) -> tuple[BranchNetwork, np.ndarray]:
-        """ """
-        # For now, use final_boundary as current boundary
-        # TODO: Compute proper current boundary that encapsulates nodes + segment length
-        current_boundary = final_boundary
-        # Place new attractions
+        """Perform one iteration of growth."""
+        # Compute current boundary based on network extent
+        current_boundary = self._compute_current_boundary(network)
+
+        # Place new attractions within current boundary
         new_attractions = self._initialize_attractions(self.num_attractions, current_boundary)
 
         # Check neighbourhoods for inclusion of previously placed attractions
@@ -259,3 +308,4 @@ class SpaceColonization(Generator):
         )
 
         return updated_network, attractions
+

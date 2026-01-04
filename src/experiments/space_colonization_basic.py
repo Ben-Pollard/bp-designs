@@ -16,7 +16,7 @@ def generate_pattern(params: dict):
     gen = SpaceColonization(**params)
     # Generate pattern using stored parameters
     network = gen.generate_pattern()
-    return network.to_geometry()
+    return network
 
 
 def main():
@@ -56,21 +56,32 @@ def main():
         Point(x=int(3 * width / 4), y=int(height), z=None),  # bottom right quarter
     ]
 
-    # Define parameter space with all variable parameters
+    # Define parameter space with pattern and render parameters
     space = ParameterSpace(
         name="space_colonization_oval_variants",
-        ranges={
+        pattern={
             "num_attractions": [1, 2, 3],  # 3 values
             "segment_length": [1.0, 2.0, 4.0],  # 3 values
             "initial_boundary": boundaries,  # 5 oval variants
             "final_boundary": boundaries,  # same as initial for now
             "root_position": root_positions,  # 3 positions
             "kill_distance": [3.0, 5.0, 8.0],  # 3 values
-        },
-        fixed={
             "seed": 42,  # Same seed for fair comparison
             "canvas": canvas,
             "max_iterations": 1000,
+        },
+        render={
+            "thickness": "descendant",
+            "min_thickness": [0.1, 0.5],  # 2 values
+            "max_thickness": 5.0,
+            "taper_power": 0.5,
+            "taper_style": "smooth",
+            "color": "black",
+            "stroke_linecap": "round",
+            "stroke_linejoin": "round",
+            "width": 100,
+            "height": 100,
+            "padding": 20,
         },
     )
 
@@ -83,8 +94,8 @@ def main():
     sample_every = max(1, len(full_grid) // 50)  # Target ~50 samples
     sampled_grid = ParameterGrid(
         space_name=f"{space.name}_sampled",
-        param_names=full_grid.param_names,
-        fixed_params=full_grid.fixed_params,
+        pattern_param_names=full_grid.pattern_param_names,
+        render_param_names=full_grid.render_param_names,
         combinations=[full_grid[i] for i in range(0, len(full_grid), sample_every)],
     )
 
