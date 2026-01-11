@@ -70,6 +70,8 @@ class BranchNetwork(Pattern):
 
     pattern_bounds: tuple[float, float, float, float] | None = None  # (xmin, ymin, xmax, ymax) for framing
 
+    thickness: np.ndarray | None = None  # (N,) - Optional stored thickness values
+
 
 
     def __post_init__(self):
@@ -81,6 +83,9 @@ class BranchNetwork(Pattern):
         assert self.timestamps.shape == (n,), "timestamps must be (N,)"
 
         assert self.positions.shape == (n, 2), "positions must be (N, 2)"
+
+        if self.thickness is not None:
+            assert self.thickness.shape == (n,), "thickness must be (N,)"
 
     # ============================================================================
 
@@ -163,6 +168,7 @@ class BranchNetwork(Pattern):
         min_thickness: float = 0.5,
         max_thickness: float = 5.0,
         taper_power: float = 0.5,
+        thickness_mode: str = 'all_nodes',
     ) -> np.ndarray:
         """Compute thickness for each node based on strategy.
         Args:
@@ -170,6 +176,7 @@ class BranchNetwork(Pattern):
             min_thickness: Minimum thickness value
             max_thickness: Maximum thickness value
             taper_power: Power law exponent for descendant mode
+            thickness_mode: Mode for descendant strategy ('all_nodes', 'leaves_only')
 
         Returns:
             (N,) array of thickness values for each node
@@ -179,11 +186,13 @@ class BranchNetwork(Pattern):
         elif thickness == 'hierarchy':
             strategy = HierarchyThickness(min_thickness, max_thickness)
         elif thickness == 'descendant':
-            strategy = DescendantThickness(min_thickness, max_thickness, taper_power)
+            strategy = DescendantThickness(min_thickness, max_thickness, taper_power, thickness_mode)
         else:
             raise ValueError(f"Unknown thickness strategy: {thickness}")
 
-        return strategy.compute_thickness(self)
+        thickness_values = strategy.compute_thickness(self)
+        self.thickness = thickness_values
+        return thickness_values
 
     def to_svg(
         self,
@@ -191,6 +200,7 @@ class BranchNetwork(Pattern):
         min_thickness: float = 0.5,
         max_thickness: float = 5.0,
         taper_power: float = 0.5,
+        thickness_mode: str = 'all_nodes',
         taper_style: str = 'smooth',  # 'smooth' or 'blocky'
         color: str = 'black',
         stroke_linecap: str = 'round',
@@ -207,6 +217,7 @@ class BranchNetwork(Pattern):
             min_thickness: Minimum branch thickness
             max_thickness: Maximum branch thickness
             taper_power: Power law for descendant thickness
+            thickness_mode: Mode for descendant strategy ('all_nodes', 'leaves_only')
             taper_style: 'smooth' for interpolated or 'blocky' for per-segment
             color: Stroke color
             stroke_linecap: SVG linecap style ('round', 'butt', 'square')
@@ -223,9 +234,13 @@ class BranchNetwork(Pattern):
 
         # Compute thickness for all nodes
         # This returns an array of length N (one for each node)
-        all_thickness = self._compute_thickness_values(
-            thickness, min_thickness, max_thickness, taper_power
-        )
+        # Use stored thickness if available and matches current request, otherwise compute
+        if self.thickness is not None and len(self.thickness) == len(self.node_ids):
+            all_thickness = self.thickness
+        else:
+            all_thickness = self._compute_thickness_values(
+                thickness, min_thickness, max_thickness, taper_power, thickness_mode
+            )
 
         # Compute view box from bounds
         if self.pattern_bounds is not None:
@@ -282,25 +297,64 @@ class BranchNetwork(Pattern):
             t_end = all_thickness[i]
 
             if taper_style == 'smooth':
-                # Use child thickness for the segment to avoid "thick neck" at branching points
-                # This ensures side branches emerge with their own natural thickness
-                t = t_end
+                # Calculate normal vector for trapezoid corners
+                v = end - start
+                length = np.linalg.norm(v)
+                if length > 0:
+                    # Normal vector (perpendicular to segment)
+                    n = np.array([-v[1], v[0]]) / length
+
+                    # Four corners of the trapezoid
+                    p1 = start + n * (t_start / 2)
+                    p2 = start - n * (t_start / 2)
+                    p3 = end - n * (t_end / 2)
+                    p4 = end + n * (t_end / 2)
+
+                    # Draw trapezoid as polygon
+                    poly = dwg.polygon(
+                        points=[
+                            (float(p1[0]), float(p1[1])),
+                            (float(p2[0]), float(p2[1])),
+                            (float(p3[0]), float(p3[1])),
+                            (float(p4[0]), float(p4[1])),
+                        ],
+                        fill=color,
+                        **kwargs
+                    )
+                    dwg.add(poly)
+
+                    # Add circular joints to smooth out junctions
+                    # We add a circle at the start and end of each segment
+                    # This ensures branching points are rounded and gaps are filled
+                    dwg.add(dwg.circle(
+                        center=(float(start[0]), float(start[1])),
+                        r=float(t_start / 2),
+                        fill=color,
+                        **kwargs
+                    ))
+                    dwg.add(dwg.circle(
+                        center=(float(end[0]), float(end[1])),
+                        r=float(t_end / 2),
+                        fill=color,
+                        **kwargs
+                    ))
+                continue
+
             elif taper_style == 'blocky':
                 # Use the thickness of the node itself
                 t = all_thickness[i]
+                # Draw line segment
+                line = dwg.line(
+                    start=(float(start[0]), float(start[1])),
+                    end=(float(end[0]), float(end[1])),
+                    stroke=color,
+                    stroke_width=t,
+                    stroke_linecap=stroke_linecap,
+                    stroke_linejoin=stroke_linejoin,
+                )
+                dwg.add(line)
             else:
                 raise ValueError(f"Unknown taper_style: {taper_style}")
-
-            # Draw line segment
-            line = dwg.line(
-                start=(float(start[0]), float(start[1])),
-                end=(float(end[0]), float(end[1])),
-                stroke=color,
-                stroke_width=t,
-                stroke_linecap=stroke_linecap,
-                stroke_linejoin=stroke_linejoin,
-            )
-            dwg.add(line)
 
 
         return dwg.tostring()
@@ -626,18 +680,31 @@ class HierarchyThickness(BranchThicknessStrategy):
 class DescendantThickness(BranchThicknessStrategy):
     """Thickness based on number of terminal descendants - flow-based approach."""
 
-    def __init__(self, min_thickness: float = 0.5, max_thickness: float = 5.0, power: float = 0.5):
+    def __init__(
+        self,
+        min_thickness: float = 0.5,
+        max_thickness: float = 5.0,
+        power: float = 0.5,
+        mode: str = 'all_nodes',
+    ):
         self.min_thickness = min_thickness
         self.max_thickness = max_thickness
         self.power = power  # For tapering curve (< 1 = gentle taper, > 1 = aggressive taper)
+        self.mode = mode
 
     def compute_thickness(self, network: BranchNetwork) -> np.ndarray:
         """Compute thickness based on downstream terminal count."""
         num_nodes = len(network.node_ids)
 
         # Count descendants for each node
-        # Every node counts as 1 unit of flow to ensure tapering even in unbranched segments
-        descendant_counts = np.ones(num_nodes, dtype=int)
+        if self.mode == 'leaves_only':
+            # Only terminal nodes (leaves) count as flow
+            descendant_counts = np.zeros(num_nodes, dtype=int)
+            leaves = network.get_leaves()
+            descendant_counts[leaves] = 1
+        else:
+            # Every node counts as 1 unit of flow (original behavior)
+            descendant_counts = np.ones(num_nodes, dtype=int)
 
         # Propagate counts up the tree (work backwards through timestamps)
         # This ensures we process children before parents

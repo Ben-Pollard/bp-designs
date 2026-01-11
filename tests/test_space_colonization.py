@@ -251,9 +251,8 @@ class TestSpaceColonization:
         small_boundary = Oval.from_width_height(40, 40, canvas=self.canvas).generate_pattern()
         initial_boundary = Oval.from_width_height(50, 50, canvas=self.canvas).generate_pattern()
 
-        # Root at center (50, 50) is outside a 40x40 oval centered at (0,0)
-        # Let's use a root at (0,0) for this test
-        root_pos = Point(0, 0, 0)
+        # Root at center (50, 50) is inside a 40x40 oval centered at (50, 50)
+        root_pos = Point(50, 50, 0)
 
         generator = SpaceColonization(
             canvas=self.canvas,

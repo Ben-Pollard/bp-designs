@@ -76,12 +76,22 @@ class Oval(Primitive2D):
     ) -> Oval:
         """Create an Oval instance from width and height.
 
-        Creates a bounding box centered at origin (0,0) with given dimensions.
+        If canvas is provided, centers the oval on the canvas.
+        Otherwise, centers at origin (0,0).
         """
-        x0 = -width / 2
-        y0 = -height / 2
-        x1 = width / 2
-        y1 = height / 2
+        if canvas is not None:
+            bounds = canvas.bounds()
+            cx = (bounds[0] + bounds[2]) / 2
+            cy = (bounds[1] + bounds[3]) / 2
+            x0 = cx - width / 2
+            y0 = cy - height / 2
+            x1 = cx + width / 2
+            y1 = cy + height / 2
+        else:
+            x0 = -width / 2
+            y0 = -height / 2
+            x1 = width / 2
+            y1 = height / 2
         return cls.from_bbox(bbox=(x0, y0, x1, y1), canvas=canvas, name=name)
 
     def generate_pattern(self, **kwargs) -> ShapePattern:
@@ -222,8 +232,8 @@ class RegularPolygon(Primitive2D):
     ) -> RegularPolygon:
         """Create a RegularPolygon instance from width and height.
 
-        Creates a bounding box centered at origin (0,0) with given dimensions,
-        then creates polygon inscribed within it.
+        If canvas is provided, centers the polygon on the canvas.
+        Otherwise, centers at origin (0,0).
 
         Args:
             sides: Number of sides
@@ -235,10 +245,19 @@ class RegularPolygon(Primitive2D):
         Returns:
             RegularPolygon instance
         """
-        x0 = -width / 2
-        y0 = -height / 2
-        x1 = width / 2
-        y1 = height / 2
+        if canvas is not None:
+            bounds = canvas.bounds()
+            cx = (bounds[0] + bounds[2]) / 2
+            cy = (bounds[1] + bounds[3]) / 2
+            x0 = cx - width / 2
+            y0 = cy - height / 2
+            x1 = cx + width / 2
+            y1 = cy + height / 2
+        else:
+            x0 = -width / 2
+            y0 = -height / 2
+            x1 = width / 2
+            y1 = height / 2
         return cls.from_bbox(sides=sides, bbox=(x0, y0, x1, y1), canvas=canvas, name=name)
 
     def generate_pattern(self, **kwargs) -> ShapePattern:

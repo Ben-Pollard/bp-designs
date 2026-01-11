@@ -81,7 +81,8 @@ def main():
             "thickness": "descendant",
             "min_thickness": [0.1, 0.5],  # 2 values
             "max_thickness": 5.0,
-            "taper_power": 0.5,
+            "taper_power": [0.2, 0.5, 0.8],
+            "thickness_mode": ["all_nodes", "leaves_only"],
             "taper_style": "smooth",
             "color": "black",
             "stroke_linecap": "round",
@@ -100,7 +101,7 @@ def main():
     # Use systematic sampling: take every nth combination
     # Use random sampling to ensure all parameter combinations (like canvas size) are represented
     import random
-    n_samples = 10
+    n_samples = 30
     random.seed(42)
     sampled_indices = random.sample(range(len(full_grid)), min(n_samples, len(full_grid)))
     sampled_indices.sort()
