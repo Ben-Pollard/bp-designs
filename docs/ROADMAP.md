@@ -9,7 +9,9 @@
 - [ ] Growth: vein size implementation, following original paper
 - [x] pattern implements to_svg
 - [x] line thickness / tapering
-- [ ] Organic rendering: Outline-based skinning (polygons instead of lines)
+- [ ] Organic rendering:
+  - [x] Network refinement (decimation, relocation, subdivision)
+  - [ ] Outline-based skinning (polygons instead of lines)
 - [ ] organs / render styles
 - [ ] colour
 

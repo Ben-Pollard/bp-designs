@@ -475,6 +475,185 @@ class BranchNetwork(Pattern):
             pattern_bounds=self.pattern_bounds
         )
 
+    def relocate(
+        self,
+        alpha: float = 0.5,
+        iterations: int = 1,
+        fix_roots: bool = True,
+        fix_leaves: bool = True,
+    ) -> BranchNetwork:
+        """Apply Laplacian smoothing to node positions.
+
+        Each node is moved towards the average position of its neighbors
+        (parent and children).
+
+        Args:
+            alpha: Smoothing factor (0-1). 0 = no change, 1 = move to average.
+            iterations: Number of smoothing passes.
+            fix_roots: If True, root nodes are not moved.
+            fix_leaves: If True, leaf nodes are not moved.
+
+        Returns:
+            New BranchNetwork with relocated positions.
+        """
+        if self.num_nodes <= 1:
+            return self
+
+        new_positions = self.positions.copy()
+
+        # Identify which nodes to move
+        to_move = np.ones(self.num_nodes, dtype=bool)
+        if fix_roots:
+            to_move[self.get_roots()] = False
+        if fix_leaves:
+            to_move[self.get_leaves()] = False
+
+        # Create a mapping from node_id to index for O(1) lookup
+        id_to_idx = {node_id: i for i, node_id in enumerate(self.node_ids)}
+
+        # Pre-calculate parent and child indices for vectorized accumulation
+        has_parent = self.parents != -1
+        child_indices = np.where(has_parent)[0]
+        parent_ids = self.parents[has_parent]
+        parent_indices = np.array([id_to_idx[pid] for pid in parent_ids])
+
+        for _ in range(iterations):
+            neighbor_sum = np.zeros_like(new_positions)
+            neighbor_count = np.zeros(self.num_nodes)
+
+            # Add parents to children
+            np.add.at(neighbor_sum, child_indices, new_positions[parent_indices])
+            np.add.at(neighbor_count, child_indices, 1)
+
+            # Add children to parents
+            np.add.at(neighbor_sum, parent_indices, new_positions[child_indices])
+            np.add.at(neighbor_count, parent_indices, 1)
+
+            # Calculate average
+            mask = neighbor_count > 0
+            avg_positions = np.zeros_like(new_positions)
+            avg_positions[mask] = neighbor_sum[mask] / neighbor_count[mask, None]
+
+            # Apply smoothing
+            move_mask = mask & to_move
+            new_positions[move_mask] = (1 - alpha) * new_positions[move_mask] + alpha * avg_positions[move_mask]
+
+        return BranchNetwork(
+            node_ids=self.node_ids.copy(),
+            positions=new_positions,
+            parents=self.parents.copy(),
+            timestamps=self.timestamps.copy(),
+            pattern_bounds=self.pattern_bounds,
+            thickness=self.thickness.copy() if self.thickness is not None else None,
+        )
+
+    def subdivide(self) -> BranchNetwork:
+        """Insert midpoints into every segment.
+
+        Returns:
+            New BranchNetwork with doubled segment resolution.
+        """
+        has_parent = self.parents != -1
+        child_indices = np.where(has_parent)[0]
+        if len(child_indices) == 0:
+            return self
+
+        # Create a mapping from node_id to index for O(1) lookup
+        id_to_idx = {node_id: i for i, node_id in enumerate(self.node_ids)}
+        parent_ids = self.parents[has_parent]
+        parent_indices = np.array([id_to_idx[pid] for pid in parent_ids])
+
+        # New positions are midpoints
+        midpoints = (self.positions[parent_indices] + self.positions[child_indices]) / 2.0
+
+        # New node IDs
+        max_id = self.node_ids.max()
+        num_new_nodes = len(child_indices)
+        new_node_ids = np.arange(max_id + 1, max_id + 1 + num_new_nodes)
+
+        # New timestamps (interpolated)
+        new_timestamps = (self.timestamps[parent_indices].astype(float) + self.timestamps[child_indices].astype(float)) / 2.0
+        new_timestamps = new_timestamps.astype(np.int16)
+
+        # Update parents of original child nodes to point to new midpoints
+        updated_parents = self.parents.copy()
+        updated_parents[child_indices] = new_node_ids
+
+        # Parents of new nodes are the original parents
+        new_parents = parent_ids
+
+        # Interpolate thickness if available
+        new_thickness = None
+        if self.thickness is not None:
+            new_thickness_vals = (self.thickness[parent_indices] + self.thickness[child_indices]) / 2.0
+            new_thickness = np.concatenate([self.thickness, new_thickness_vals])
+
+        return BranchNetwork(
+            node_ids=np.concatenate([self.node_ids, new_node_ids]),
+            positions=np.concatenate([self.positions, midpoints]),
+            parents=np.concatenate([updated_parents, new_parents]),
+            timestamps=np.concatenate([self.timestamps, new_timestamps]),
+            pattern_bounds=self.pattern_bounds,
+            thickness=new_thickness,
+        )
+
+    def decimate(self, min_distance: float = 1.0) -> BranchNetwork:
+        """Remove nodes that are too close to their parents.
+
+        Args:
+            min_distance: Minimum allowed distance between node and parent.
+
+        Returns:
+            New BranchNetwork with redundant nodes removed.
+        """
+        if self.num_nodes <= 1:
+            return self
+
+        has_parent = self.parents != -1
+        child_indices = np.where(has_parent)[0]
+        parent_ids = self.parents[has_parent]
+
+        # Map parent_id to index
+        id_to_idx = {node_id: i for i, node_id in enumerate(self.node_ids)}
+        parent_indices = np.array([id_to_idx[pid] for pid in parent_ids])
+
+        dists = np.linalg.norm(self.positions[child_indices] - self.positions[parent_indices], axis=1)
+
+        to_remove_mask = np.zeros(self.num_nodes, dtype=bool)
+        to_remove_mask[child_indices[dists < min_distance]] = True
+
+        # Roots should never be removed
+        to_remove_mask[self.get_roots()] = False
+
+        if not np.any(to_remove_mask):
+            return self
+
+        # Update parents of all nodes to point to their first non-removed ancestor
+        new_parents = self.parents.copy()
+        for i in range(self.num_nodes):
+            if self.parents[i] == -1:
+                continue
+
+            curr_parent_id = self.parents[i]
+            while curr_parent_id != -1:
+                curr_parent_idx = id_to_idx[curr_parent_id]
+                if not to_remove_mask[curr_parent_idx]:
+                    break
+                curr_parent_id = self.parents[curr_parent_idx]
+            new_parents[i] = curr_parent_id
+
+        # Filter nodes
+        keep_mask = ~to_remove_mask
+
+        return BranchNetwork(
+            node_ids=self.node_ids[keep_mask],
+            positions=self.positions[keep_mask],
+            parents=new_parents[keep_mask],
+            timestamps=self.timestamps[keep_mask],
+            pattern_bounds=self.pattern_bounds,
+            thickness=self.thickness[keep_mask] if self.thickness is not None else None,
+        )
+
     def taper_weights(self, base_width: float = 1.0, taper_rate: float = 0.8) -> np.ndarray:
         """Compute stroke widths based on hierarchy depth.
 

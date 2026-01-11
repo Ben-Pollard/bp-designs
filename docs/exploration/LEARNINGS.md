@@ -78,5 +78,6 @@
 - Field-based abstraction enables universal composition without custom pairwise logic
 - Keep experiment module separate from pattern generation for clean separation of concerns
 - Use `poetry run python` to ensure correct Python version (>=3.12,<3.13)
+- **Network Refinement**: Raw algorithmic output (like Space Colonization) is often too jagged for physical fabrication. A three-step refinement process (Decimate → Subdivide → Relocate) significantly improves organic quality and manufacturability.
 
 ---
