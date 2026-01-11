@@ -222,13 +222,10 @@ class BranchNetwork(Pattern):
 
 
         # Compute thickness for all nodes
-        node_thickness = self._compute_thickness_values(
+        # This returns an array of length N (one for each node)
+        all_thickness = self._compute_thickness_values(
             thickness, min_thickness, max_thickness, taper_power
         )
-
-        # Add root thickness (same as first child or max)
-        root_thickness = max_thickness if len(node_thickness) == 0 else node_thickness[0]
-        all_thickness = np.concatenate([[root_thickness], node_thickness])
 
         # Compute view box from bounds
         if self.pattern_bounds is not None:
@@ -263,10 +260,18 @@ class BranchNetwork(Pattern):
         # Actually, SVG doesn't support varying stroke width along a path natively
         # So we render each segment separately with interpolated thickness
 
+        # Create a mapping from node_id to index for O(1) lookup
+        id_to_idx = {node_id: i for i, node_id in enumerate(self.node_ids)}
+
         for i in range(len(self.node_ids)):
-            parent_idx = self.parents[i]
-            if parent_idx == -1:
+            parent_id = self.parents[i]
+            if parent_id == -1:
                 continue
+
+            # Get parent index
+            if parent_id not in id_to_idx:
+                continue
+            parent_idx = id_to_idx[parent_id]
 
             # Get positions
             start = self.positions[parent_idx]
@@ -281,6 +286,7 @@ class BranchNetwork(Pattern):
                 # This ensures side branches emerge with their own natural thickness
                 t = t_end
             elif taper_style == 'blocky':
+                # Use the thickness of the node itself
                 t = all_thickness[i]
             else:
                 raise ValueError(f"Unknown taper_style: {taper_style}")
@@ -573,8 +579,7 @@ class TimestampThickness(BranchThicknessStrategy):
 
     def compute_thickness(self, network: BranchNetwork) -> np.ndarray:
         """Compute thickness based on inverse timestamp (older = thicker)."""
-        # Exclude root node (has no parent edge)
-        node_timestamps = network.timestamps[1:]  # Skip root
+        node_timestamps = network.timestamps
 
         max_time = network.timestamps.max()
         # Invert so older nodes (lower timestamp) get higher values
@@ -606,15 +611,13 @@ class HierarchyThickness(BranchThicknessStrategy):
                 parent_idx = np.where(network.node_ids == parent_id)[0][0]
                 depths[i] = depths[parent_idx] + 1
 
-        # Exclude root
-        node_depths = depths[1:]
-        max_depth = node_depths.max() if len(node_depths) > 0 else 1
+        max_depth = depths.max() if len(depths) > 0 else 1
 
         # Normalize and invert (shallow = thick)
         if max_depth > 0:
-            depth_normalized = 1.0 - (node_depths / max_depth)
+            depth_normalized = 1.0 - (depths / max_depth)
         else:
-            depth_normalized = np.ones_like(node_depths, dtype=float)
+            depth_normalized = np.ones_like(depths, dtype=float)
 
         thickness = self.min_thickness + depth_normalized * (self.max_thickness - self.min_thickness)
         return thickness
@@ -633,33 +636,37 @@ class DescendantThickness(BranchThicknessStrategy):
         num_nodes = len(network.node_ids)
 
         # Count descendants for each node
-        descendant_counts = np.zeros(num_nodes, dtype=int)
-
-        # Find terminal nodes (no children)
-        is_parent = np.isin(network.node_ids, network.parents[network.parents >= 0])
-        terminal_mask = ~is_parent
-
-        # Each terminal node counts as 1 for itself
-        descendant_counts[terminal_mask] = 1
+        # Every node counts as 1 unit of flow to ensure tapering even in unbranched segments
+        descendant_counts = np.ones(num_nodes, dtype=int)
 
         # Propagate counts up the tree (work backwards through timestamps)
+        # This ensures we process children before parents
         sorted_indices = np.argsort(network.timestamps)[::-1]  # Newest to oldest
+
+        # Create a mapping from node_id to index for O(1) lookup
+        id_to_idx = {node_id: i for i, node_id in enumerate(network.node_ids)}
 
         for idx in sorted_indices:
             parent_id = network.parents[idx]
             if parent_id >= 0:  # Not root
-                parent_idx = np.where(network.node_ids == parent_id)[0][0]
-                descendant_counts[parent_idx] += descendant_counts[idx]
+                # Use the mapping for robust and fast lookup
+                if parent_id in id_to_idx:
+                    parent_idx = id_to_idx[parent_id]
+                    descendant_counts[parent_idx] += descendant_counts[idx]
 
-        # Exclude root for edge thickness
-        node_counts = descendant_counts[1:]
-        max_count = node_counts.max() if len(node_counts) > 0 else 1
+        # Debug: print some counts to see if they are propagating
+        # print(f"Max descendant count: {descendant_counts.max()}")
+
+        # Use the root's descendant count as the max for normalization
+        # This ensures the trunk is always max_thickness
+        max_count = descendant_counts.max() if len(descendant_counts) > 0 else 1
 
         # Normalize with power law for tapering
         if max_count > 0:
-             count_normalized = (node_counts / max_count) ** self.power
+             # We want the root to be 1.0 and leaves to be close to 0.0
+             count_normalized = (descendant_counts / max_count) ** self.power
         else:
-            count_normalized = np.zeros_like(node_counts, dtype=float)
+            count_normalized = np.zeros_like(descendant_counts, dtype=float)
 
         thickness = self.min_thickness + count_normalized * (self.max_thickness - self.min_thickness)
         return thickness

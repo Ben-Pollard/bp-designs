@@ -1,11 +1,9 @@
 """Space Colonization algorithm - vectorized implementation with semantic preservation."""
 
 import numpy as np
-from einops import rearrange, reduce
-from shapely.geometry import Point as ShapelyPoint
 from shapely.geometry import Polygon as ShapelyPolygon
 
-from bp_designs.core.directions import DirectionVectors, PairwiseCoordinateVectors
+from bp_designs.core.directions import DirectionVectors
 from bp_designs.core.generator import Generator
 from bp_designs.core.geometry import Canvas, Point, Polygon
 from bp_designs.core.pattern import Pattern
@@ -102,7 +100,7 @@ class SpaceColonization(Generator):
 
         for _ in range(self.max_iterations):
             network, attractions = self._iterate(network_previous, attractions)
-            if len(attractions) == 0:
+            if attractions.size == 0:
                 break
             if network.num_nodes == network_previous.num_nodes:
                 break
@@ -156,19 +154,23 @@ class SpaceColonization(Generator):
         points = []
         batch_size = min(num_attractions * 2, 1000)
 
-        while len(points) < num_attractions:
+        # Safety break to avoid infinite loop if boundary is too small
+        max_attempts = 100
+        attempts = 0
+
+        while len(points) < num_attractions and attempts < max_attempts:
+            attempts += 1
             # Generate candidate points in bounding box
             x = self.rng.uniform(xmin, xmax, batch_size)
             y = self.rng.uniform(ymin, ymax, batch_size)
             candidates = np.column_stack([x, y])  # (batch_size, 2)
 
-            # Check which points are inside polygon using shapely
-            # Simple loop is fine for now
-            for point in candidates:
-                if shapely_poly.contains(ShapelyPoint(point)):
-                    points.append(point)
-                    if len(points) >= num_attractions:
-                        break
+            # Vectorized containment check using shapely.contains
+            import shapely
+            candidate_points = shapely.points(candidates)
+            mask = shapely.contains(shapely_poly, candidate_points)
+            valid_points = candidates[mask]
+            points.extend(valid_points)
 
         return np.array(points[:num_attractions])
 
@@ -184,12 +186,10 @@ class SpaceColonization(Generator):
         Returns:
             Polygon defining current growth boundary
         """
-        # Create shapely points from network positions
-        points = [ShapelyPoint(pos) for pos in network.positions]
-
         # Compute convex hull of all nodes
-        from shapely.geometry import MultiPoint
-        hull = MultiPoint(points).convex_hull
+        import shapely
+        points = shapely.points(network.positions)
+        hull = shapely.convex_hull(shapely.multipoints(points))
 
         # Buffer by expansion distance
         expanded = hull.buffer(self.boundary_expansion)
@@ -220,54 +220,83 @@ class SpaceColonization(Generator):
             return self.final_boundary
 
     def _attraction_vectors(
-        self, network: BranchNetwork, attractions: np.ndarray
-    ) -> PairwiseCoordinateVectors:
+        self, network: BranchNetwork, attractions: np.ndarray, influence_distance: float = None
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute vectors from network nodes to attraction points.
 
         Args:
             network: BranchNetwork with N nodes
             attractions: (M, 2) array of attraction point positions
+            influence_distance: Optional maximum distance for attraction
 
         Returns:
-            AttractionVectors containing pairwise vectors, distances, and directions
+            tuple of (closest_node_indices, dists, vectors)
         """
-        attr_vectors = rearrange(attractions, "m c -> 1 m c") - rearrange(
-            network.positions, "n c -> n 1 c"
-        )  # (n,m,c)
-        attr_norms = np.linalg.norm(attr_vectors, axis=2)  # (n,m)
-        attr_directions = attr_vectors / rearrange(attr_norms, "n m -> n m 1")  # (n,m)
-        return PairwiseCoordinateVectors(
-            vectors=attr_vectors, norms=attr_norms, directions=attr_directions
-        )
+        if attractions.size == 0:
+            return np.array([], dtype=int), np.array([], dtype=float), np.array([], dtype=float).reshape(0, 2)
 
-    def _growth_vectors(self, attraction_vectors: PairwiseCoordinateVectors) -> DirectionVectors:
-        """Compute growth vectors from attraction vectors.
+        # Optimization: Use KDTree to find closest nodes for each attraction point.
+        # This avoids the O(N*M) distance matrix.
+        try:
+            from scipy.spatial import cKDTree
+            node_tree = cKDTree(network.positions)
+
+            # For each attraction point, find the closest node
+            # dists: (M,), closest_node_indices: (M,)
+            dists, closest_node_indices = node_tree.query(attractions, k=1)
+
+            # Compute vectors only for the closest pairs
+            vectors = attractions - network.positions[closest_node_indices]
+
+            return closest_node_indices, dists, vectors
+
+        except ImportError:
+            # Fallback to dense broadcasting if scipy is missing
+            attr_vectors = attractions[None, :, :] - network.positions[:, None, :]
+            attr_norms = np.sqrt(np.sum(attr_vectors**2, axis=2))
+            closest_node_indices = np.argmin(attr_norms, axis=0)
+            dists = np.min(attr_norms, axis=0)
+            vectors = attractions - network.positions[closest_node_indices]
+            return closest_node_indices, dists, vectors
+
+    def _growth_vectors(self, closest_node_indices: np.ndarray, dists: np.ndarray, vectors: np.ndarray, num_nodes: int) -> DirectionVectors:
+        """Compute growth vectors from attraction data.
 
         Args:
-            attraction_vectors: PairwiseCoordinateVectors representing attractions
+            closest_node_indices: (M,) index of closest node for each attraction point
+            dists: (M,) distance to closest node
+            vectors: (M, 2) vector from node to attraction point
+            num_nodes: Total number of nodes in network
 
         Returns:
             DirectionVectors for each node
         """
-        if attraction_vectors.empty:
+        if dists.size == 0:
             return DirectionVectors(
                 vectors=np.empty([0, 2]), norms=np.empty([0]), directions=np.empty([0, 2])
             )
-        # Nodes grow if they are nearest to a source
-        # Nodes are influenced only by the sources they are closest to
-        closest_nodes = attraction_vectors.norms.argmin(axis=0)  # (M,)
-        num_nodes = attraction_vectors.norms.shape[0]
-        closest_mask = closest_nodes == np.arange(num_nodes)[:, None]
-        closest_directions = np.where(
-            closest_mask[..., None], attraction_vectors.directions, np.nan
-        )
 
-        node_directions = reduce(closest_directions, "n m coord -> n coord", np.nanmean)
-        norms = rearrange(np.linalg.norm(node_directions, axis=1), "n -> n 1")
-        normalised_node_directions = node_directions / norms
+        # Initialize node directions
+        node_directions = np.zeros((num_nodes, 2))
+
+        # Compute directions for attraction points
+        with np.errstate(divide='ignore', invalid='ignore'):
+            mask = dists > 0
+            directions = np.zeros_like(vectors)
+            directions[mask] = vectors[mask] / dists[mask, None]
+
+        # For each attraction point, add its direction to its closest node
+        np.add.at(node_directions, closest_node_indices, directions)
+
+        # Normalize node directions
+        norms = np.sqrt(np.sum(node_directions**2, axis=1))[:, None]
+
+        with np.errstate(divide='ignore', invalid='ignore'):
+            normalised_node_directions = np.where(norms > 0, node_directions / norms, 0.0)
 
         growth_vectors = normalised_node_directions * self.segment_length
-        growth_norms = np.linalg.norm(growth_vectors, axis=1)
+        growth_norms = np.sqrt(np.sum(growth_vectors**2, axis=1))
+
         return DirectionVectors(
             vectors=growth_vectors, norms=growth_norms, directions=normalised_node_directions
         )
@@ -286,35 +315,53 @@ class SpaceColonization(Generator):
 
         # Check neighbourhoods for inclusion of previously placed attractions
         if attractions.size > 0:
-            new_attr_vectors = rearrange(attractions, "m c -> 1 m c") - rearrange(
-                new_attractions, "mn c -> mn 1 c"
-            )  # (mn m c)
-            new_attr_norms = np.linalg.norm(new_attr_vectors, axis=2)  # (mn, m)
-            new_attr_selection = reduce(new_attr_norms, "mn m -> mn", "min") > self.kill_distance
+            try:
+                from scipy.spatial import cKDTree
+                tree = cKDTree(attractions)
+                dist, _ = tree.query(new_attractions, k=1)
+                new_attr_selection = dist > self.kill_distance
+            except ImportError:
+                new_attr_vectors = new_attractions[None, :, :] - attractions[:, None, :]
+                new_attr_norms = np.sqrt(np.sum(new_attr_vectors**2, axis=2))
+                new_attr_selection = np.min(new_attr_norms, axis=0) > self.kill_distance
+
             attractions = np.vstack([attractions, new_attractions[new_attr_selection, :]])
         else:
             attractions = new_attractions
 
-        # Calculate vectors between nodes and sources
-        attraction_vectors = self._attraction_vectors(network, attractions)
-
         # Remove colonized attractions (those within kill distance of nodes)
-        kill_mask = reduce(attraction_vectors.norms, "n m -> m", "min") > self.kill_distance
+        try:
+            from scipy.spatial import cKDTree
+            node_tree = cKDTree(network.positions)
+            dist, _ = node_tree.query(attractions, k=1)
+            kill_mask = dist > self.kill_distance
+        except ImportError:
+            # Fallback to dense if scipy missing
+            attr_vectors = attractions[None, :, :] - network.positions[:, None, :]
+            attr_norms = np.sqrt(np.sum(attr_vectors**2, axis=2))
+            kill_mask = np.min(attr_norms, axis=0) > self.kill_distance
+
         attractions = attractions[kill_mask, :]
 
-        # Calculate the attraction vectors
-        attraction_vectors = self._attraction_vectors(network, attractions)
+        # Calculate the attraction data using KDTree
+        closest_node_indices, dists, vectors = self._attraction_vectors(network, attractions)
 
-        # Filter tree down to just the growing nodes
-        growth_node_indices = np.unique(attraction_vectors.norms.argmin(axis=0))
+        if dists.size == 0:
+            return network, attractions
+
+        # Filter down to just the growing nodes (those that are closest to at least one attraction point)
+        growth_node_indices = np.unique(closest_node_indices)
         growing_nodes = network.get_nodes(growth_node_indices)
-        attraction_vectors = attraction_vectors.get_n(growth_node_indices)
 
-        # Calculate growth vectors of growing nodes
-        growth_vectors = self._growth_vectors(attraction_vectors)
+        # Calculate growth vectors
+        growth_vectors = self._growth_vectors(closest_node_indices, dists, vectors, network.num_nodes)
+
+        # We only care about growth vectors for the growing nodes
+        active_growth_vectors = growth_vectors.vectors[growth_node_indices]
 
         # Create updated network with new nodes
-        new_positions = growing_nodes.positions + growth_vectors.vectors
+        new_positions = growing_nodes.positions + active_growth_vectors
+
         num_new_nodes = new_positions.shape[0]
         next_node_id = network.node_ids.max() + 1
         new_node_ids = np.arange(next_node_id, next_node_id + num_new_nodes)
