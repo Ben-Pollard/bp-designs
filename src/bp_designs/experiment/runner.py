@@ -75,7 +75,7 @@ class ExperimentRunner:
         output_dir: str | Path = "output/experiments",
         svg_width: float = 100,
         svg_height: float = 100,
-        stroke_width: float = 0.3,
+        stroke_width: float | None = 0.3,
         gallery_dir: str | Path = "gallery",
     ):
         """Initialize experiment runner.
@@ -97,7 +97,7 @@ class ExperimentRunner:
             svg_height: SVG canvas height in mm
 
 
-            stroke_width: Default stroke width in mm
+            stroke_width: Default stroke width in mm (None to use pattern defaults)
             gallery_dir: Directory for gallery index files
         """
 
@@ -209,7 +209,7 @@ class ExperimentRunner:
                     "params": self._serialize_value(params),
                     "svg_path": f"outputs/{variant_id}.svg",
                     "svg_size": {"width": svg_width, "height": svg_height},
-                    "stroke_width": render_params.get('stroke_width', self.stroke_width),
+                    "stroke_width": render_params.get('stroke_width', self.stroke_width) or "default",
                 }
 
                 metadata_path = self.outputs_dir / f"{variant_id}.json"

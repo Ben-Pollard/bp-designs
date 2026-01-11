@@ -140,8 +140,8 @@ class Cells(Pattern):
         fill: str | None = None,
         stroke_linecap: str = "round",
         stroke_linejoin: str = "round",
-        width: float = 800,
-        height: float = 600,
+        width: str | float = "100%",
+        height: str | float = "100%",
         padding: float = 20,
         background: str | None = None,
     ) -> str:
@@ -153,8 +153,8 @@ class Cells(Pattern):
             fill: Fill color (or None for no fill)
             stroke_linecap: SVG linecap style ('round', 'butt', 'square')
             stroke_linejoin: SVG linejoin style ('round', 'miter', 'bevel')
-            width: SVG canvas width in pixels
-            height: SVG canvas height in pixels
+            width: SVG canvas width (default '100%' for responsive)
+            height: SVG canvas height (default '100%' for responsive)
             padding: Padding around shape in SVG units
             background: Background color (or None for transparent)
 
@@ -175,9 +175,15 @@ class Cells(Pattern):
         view_width = xmax - xmin
         view_height = ymax - ymin
 
+        # Format size for svgwrite
+        def format_size(s):
+            if isinstance(s, str):
+                return s
+            return f"{s}px"
+
         # Create SVG drawing
         dwg = svgwrite.Drawing(
-            size=(f"{width}px", f"{height}px"),
+            size=(format_size(width), format_size(height)),
             viewBox=f"{xmin} {ymin} {view_width} {view_height}",
         )
 

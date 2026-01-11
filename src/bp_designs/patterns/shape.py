@@ -8,26 +8,66 @@ from __future__ import annotations
 import numpy as np
 import svgwrite
 
-from bp_designs.core.geometry import Polygon, Polyline
+from bp_designs.core.geometry import Canvas, Point, Polygon, Polyline
 from bp_designs.core.pattern import Pattern
+
+
+class PointPattern(Pattern):
+    """Pattern representing a single point.
+
+    Can be absolute or relative (0-1).
+    """
+
+    def __init__(self, x: float, y: float, is_relative: bool = False, name: str | None = None):
+        self.x = x
+        self.y = y
+        self.is_relative = is_relative
+        self._name = name
+
+    def to_geometry(self, canvas: Canvas | None = None) -> Point:
+        """Resolve to a Point geometry."""
+        if self.is_relative and canvas is not None:
+            bounds = canvas.bounds()
+            width = bounds[2] - bounds[0]
+            height = bounds[3] - bounds[1]
+            abs_x = bounds[0] + self.x * width
+            abs_y = bounds[1] + self.y * height
+            return Point(x=abs_x, y=abs_y, z=None)
+        return Point(x=self.x, y=self.y, z=None)
+
+    def to_svg(self, **kwargs) -> str:
+        """Points don't have a standard SVG representation in our system yet."""
+        return ""
+
+    def __str__(self) -> str:
+        if self._name:
+            return self._name
+        return f"Point({'rel' if self.is_relative else 'abs'}:{self.x},{self.y})"
 
 
 class ShapePattern(Pattern):
     """Pattern wrapper for simple geometric shapes.
 
     Holds a Polygon and can convert it to geometry (as polyline).
+    Supports lazy resolution against a canvas.
     """
 
-    def __init__(self, polygon: Polygon, name: str | None = None):
+    def __init__(
+        self,
+        polygon: Polygon,
+        name: str | None = None,
+        is_relative: bool = False,
+    ):
         """Initialize shape pattern.
 
         Args:
             polygon: The polygon defining the shape
-            name: Optional descriptive name for the shape. If not provided,
-                a name will be generated from the bounding box.
+            name: Optional descriptive name for the shape.
+            is_relative: If True, coordinates are treated as 0-1 and scaled to canvas.
         """
         self.polygon = polygon
         self._name = name
+        self.is_relative = is_relative
 
     def __str__(self) -> str:
         """Return human-readable string representation."""
@@ -44,34 +84,36 @@ class ShapePattern(Pattern):
         if not isinstance(other, ShapePattern):
             return False
         # Compare coordinate arrays using np.array_equal
-        return np.array_equal(self.polygon.coords, other.polygon.coords)
+        return np.array_equal(self.polygon.coords, other.polygon.coords) and self.is_relative == other.is_relative
 
     def __hash__(self) -> int:
-        """Hash based on polygon coordinates.
-
-        Converts coordinates to tuple of tuples for hashing.
-        """
-        # Flatten coordinates and convert to tuple for hashing
+        """Hash based on polygon coordinates."""
         coords = self.polygon.coords
         if coords.size == 0:
-            return hash(())
-        # Convert to tuple of tuples (each point as tuple)
+            return hash((self.is_relative,))
         coord_tuples = tuple(tuple(map(float, point)) for point in coords)
-        return hash(coord_tuples)
+        return hash((coord_tuples, self.is_relative))
 
-    def to_geometry(self) -> Polyline:
+    def to_geometry(self, canvas: Canvas | None = None) -> Polyline:
         """Convert polygon to polyline geometry.
 
-        Returns:
-            Polyline containing the polygon as a closed loop.
+        If is_relative is True and canvas is provided, scales coordinates.
         """
-        # Ensure polygon is closed (first point == last point)
         coords = self.polygon.coords
+
+        if self.is_relative and canvas is not None:
+            bounds = canvas.bounds()
+            width = bounds[2] - bounds[0]
+            height = bounds[3] - bounds[1]
+            # Scale and shift
+            coords = coords.copy()
+            coords[:, 0] = bounds[0] + coords[:, 0] * width
+            coords[:, 1] = bounds[1] + coords[:, 1] * height
+
+        # Ensure polygon is closed (first point == last point)
         if len(coords) > 0 and not np.allclose(coords[0], coords[-1]):
-            # Append first point to close the polygon
             coords = np.vstack([coords, coords[0:1]])
 
-        # Return as a single polyline (closed loop)
         return Polyline(polylines=[coords])
 
     def to_svg(
@@ -81,8 +123,8 @@ class ShapePattern(Pattern):
         fill: str | None = None,
         stroke_linecap: str = "round",
         stroke_linejoin: str = "round",
-        width: float = 800,
-        height: float = 600,
+        width: str | float = "100%",
+        height: str | float = "100%",
         padding: float = 20,
         background: str | None = None,
     ) -> str:
@@ -94,8 +136,8 @@ class ShapePattern(Pattern):
             fill: Fill color (or None for no fill)
             stroke_linecap: SVG linecap style ('round', 'butt', 'square')
             stroke_linejoin: SVG linejoin style ('round', 'miter', 'bevel')
-            width: SVG canvas width in pixels
-            height: SVG canvas height in pixels
+            width: SVG canvas width (default '100%' for responsive)
+            height: SVG canvas height (default '100%' for responsive)
             padding: Padding around shape in SVG units
             background: Background color (or None for transparent)
 
@@ -116,9 +158,15 @@ class ShapePattern(Pattern):
         view_width = xmax - xmin
         view_height = ymax - ymin
 
+        # Format size for svgwrite
+        def format_size(s):
+            if isinstance(s, str):
+                return s
+            return f"{s}px"
+
         # Create SVG drawing
         dwg = svgwrite.Drawing(
-            size=(f"{width}px", f"{height}px"),
+            size=(format_size(width), format_size(height)),
             viewBox=f"{xmin} {ymin} {view_width} {view_height}",
         )
 

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 import svgwrite
 
-from bp_designs.core.geometry import Polyline
+from bp_designs.core.geometry import Canvas, Polyline
 from bp_designs.core.pattern import Pattern
 
 
@@ -68,6 +68,8 @@ class BranchNetwork(Pattern):
 
     timestamps: np.ndarray  # (N,) - Growth order (iteration when added)
 
+    pattern_bounds: tuple[float, float, float, float] | None = None  # (xmin, ymin, xmax, ymax) for framing
+
 
 
     def __post_init__(self):
@@ -88,43 +90,52 @@ class BranchNetwork(Pattern):
 
 
 
-    def to_geometry(self) -> Polyline:
+    def to_geometry(self, canvas: Canvas | None = None) -> Polyline:
         """Convert to polyline representation for export.
 
-
-
         Extracts each branch as a complete path from leaf to root.
-
-
         Nodes can appear in multiple branches (shared trunk segments).
 
-
+        If canvas is provided, the network is scaled to fit the canvas bounds
+        relative to its original pattern_bounds.
 
         Returns:
-
-
             List of polylines (each is Mx2 array)
         """
+        positions = self.positions
+
+        if canvas is not None and self.pattern_bounds is not None:
+            # Scale positions to fit new canvas
+            orig_xmin, orig_ymin, orig_xmax, orig_ymax = self.pattern_bounds
+            orig_width = orig_xmax - orig_xmin
+            orig_height = orig_ymax - orig_ymin
+
+            new_xmin, new_ymin, new_xmax, new_ymax = canvas.bounds()
+            new_width = new_xmax - new_xmin
+            new_height = new_ymax - new_ymin
+
+            if orig_width > 0 and orig_height > 0:
+                positions = positions.copy()
+                # Normalize to 0-1
+                positions[:, 0] = (positions[:, 0] - orig_xmin) / orig_width
+                positions[:, 1] = (positions[:, 1] - orig_ymin) / orig_height
+                # Scale to new canvas
+                positions[:, 0] = new_xmin + positions[:, 0] * new_width
+                positions[:, 1] = new_ymin + positions[:, 1] * new_height
 
         leaves = self.get_leaves()
-
         branches = []
 
         for leaf_idx in leaves:
             # Trace from leaf to root
-
             path = []
-
             current = leaf_idx
-
             while current != -1:
-                path.append(self.positions[current])
-
+                path.append(positions[current])
                 current = self.parents[current]
 
             if len(path) >= 2:
                 # Reverse to get root → leaf order
-
                 branches.append(np.array(path[::-1]))
 
         return Polyline(polylines=branches)
@@ -184,8 +195,8 @@ class BranchNetwork(Pattern):
         color: str = 'black',
         stroke_linecap: str = 'round',
         stroke_linejoin: str = 'round',
-        width: float = 800,
-        height: float = 600,
+        width: str | float = '100%',
+        height: str | float = '100%',
         padding: float = 20,
         **kwargs
     ) -> str:
@@ -200,8 +211,8 @@ class BranchNetwork(Pattern):
             color: Stroke color
             stroke_linecap: SVG linecap style ('round', 'butt', 'square')
             stroke_linejoin: SVG linejoin style ('round', 'miter', 'bevel')
-            width: SVG canvas width
-            height: SVG canvas height
+            width: SVG canvas width (default '100%' for responsive)
+            height: SVG canvas height (default '100%' for responsive)
             padding: Padding around content
             **kwargs: Additional SVG attributes
 
@@ -220,7 +231,10 @@ class BranchNetwork(Pattern):
         all_thickness = np.concatenate([[root_thickness], node_thickness])
 
         # Compute view box from bounds
-        xmin, ymin, xmax, ymax = self.bounds()
+        if self.pattern_bounds is not None:
+            xmin, ymin, xmax, ymax = self.pattern_bounds
+        else:
+            xmin, ymin, xmax, ymax = self.bounds()
 
         # Add padding
         xmin -= padding
@@ -231,9 +245,15 @@ class BranchNetwork(Pattern):
         view_width = xmax - xmin
         view_height = ymax - ymin
 
+        # Format size for svgwrite
+        def format_size(s):
+            if isinstance(s, str):
+                return s
+            return f'{s}px'
+
         # Create SVG
         dwg = svgwrite.Drawing(
-            size=(f'{width}px', f'{height}px'),
+            size=(format_size(width), format_size(height)),
             viewBox=f'{xmin} {ymin} {view_width} {view_height}',
             **kwargs
         )
@@ -257,8 +277,9 @@ class BranchNetwork(Pattern):
             t_end = all_thickness[i]
 
             if taper_style == 'smooth':
-                # Use average thickness for this segment
-                t = (t_start + t_end) / 2
+                # Use child thickness for the segment to avoid "thick neck" at branching points
+                # This ensures side branches emerge with their own natural thickness
+                t = t_end
             elif taper_style == 'blocky':
                 t = all_thickness[i]
             else:
@@ -390,7 +411,8 @@ class BranchNetwork(Pattern):
             node_ids=self.node_ids[selection],
             positions=self.positions[selection],
             parents=self.parents[selection],
-            timestamps=self.timestamps[selection]
+            timestamps=self.timestamps[selection],
+            pattern_bounds=self.pattern_bounds
         )
 
     def taper_weights(self, base_width: float = 1.0, taper_rate: float = 0.8) -> np.ndarray:

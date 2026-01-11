@@ -24,7 +24,7 @@ class SpaceColonization(Generator):
     def __init__(
         self,
         canvas: Canvas,
-        root_position: Point,
+        root_position: Point | Pattern,
         initial_boundary: Pattern,
         final_boundary: Pattern,
         seed: int = 0,
@@ -54,16 +54,33 @@ class SpaceColonization(Generator):
         self.kill_distance = kill_distance
         self.segment_length = segment_length
         self.boundary_expansion = boundary_expansion
-        self.root_position = root_position
+        self.root_position_pattern = root_position
         self.canvas = canvas
-        # Convert Point to array for positions
-        self.root_position_array = np.array([root_position.x, root_position.y], dtype=float)
         # Store boundary patterns
         self.initial_boundary_pattern = initial_boundary
         self.final_boundary_pattern = final_boundary
-        # Extract polygons from patterns for internal use
-        self.initial_boundary = initial_boundary.polygon
-        self.final_boundary = final_boundary.polygon
+
+        # Resolve patterns to geometry using canvas
+        if isinstance(root_position, Pattern):
+            resolved_root = root_position.to_geometry(canvas)
+            if not isinstance(resolved_root, Point):
+                raise ValueError(f"root_position pattern must resolve to Point, got {type(resolved_root)}")
+            self.root_position_array = np.array([resolved_root.x, resolved_root.y], dtype=float)
+        else:
+            self.root_position_array = np.array([root_position.x, root_position.y], dtype=float)
+
+        # Resolve boundaries to polygons
+        initial_geom = initial_boundary.to_geometry(canvas)
+        if hasattr(initial_geom, 'polylines'): # Polyline
+             self.initial_boundary = Polygon(coords=initial_geom.polylines[0])
+        else:
+             raise ValueError(f"initial_boundary must resolve to Polyline/Polygon, got {type(initial_geom)}")
+
+        final_geom = final_boundary.to_geometry(canvas)
+        if hasattr(final_geom, 'polylines'): # Polyline
+             self.final_boundary = Polygon(coords=final_geom.polylines[0])
+        else:
+             raise ValueError(f"final_boundary must resolve to Polyline/Polygon, got {type(final_geom)}")
         self.max_iterations = max_iterations
 
     def generate_pattern(self, **kwargs) -> BranchNetwork:
@@ -91,6 +108,8 @@ class SpaceColonization(Generator):
                 break
             network_previous = network
 
+        # Ensure pattern_bounds is set on the final network
+        network.pattern_bounds = self.canvas.bounds()
         return network
 
     def _initialize_network(self, timestamp: int) -> BranchNetwork:
@@ -107,6 +126,7 @@ class SpaceColonization(Generator):
             positions=self.root_position_array.reshape(1, 2),  # (N,2) - root position as array
             parents=np.array([-1], dtype=np.int16),  # (N,) - root has no parent
             timestamps=np.array([timestamp], dtype=np.int16),  # (N,) - root timestamp
+            pattern_bounds=self.canvas.bounds(),
         )
         return network
 

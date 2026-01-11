@@ -16,9 +16,9 @@ class Geometry(ABC):
 
 @dataclass
 class Point(Geometry):
-    x: int
-    y: int
-    z: int | None
+    x: float
+    y: float
+    z: float | None
 
     def __str__(self) -> str:
         """Return concise string representation."""

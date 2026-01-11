@@ -8,7 +8,8 @@
 - [ ] expand intitial bounds around current nodes, kill out-of-bounds sources.
 - [ ] Growth: vein size implementation, following original paper
 - [x] pattern implements to_svg
-- [ ] line thickness / tapering 
+- [x] line thickness / tapering
+- [ ] Organic rendering: Outline-based skinning (polygons instead of lines)
 - [ ] organs / render styles
 - [ ] colour
 

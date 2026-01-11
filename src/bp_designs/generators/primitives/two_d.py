@@ -96,20 +96,23 @@ class Oval(Primitive2D):
         cx = (x0 + x1) / 2
         cy = (y0 + y1) / 2
 
-        # If canvas is provided, adjust position and scale to fit
+        is_relative = False
+        # If canvas is provided, we treat the bbox as relative to that canvas
+        # and return a relative ShapePattern
         if self.canvas is not None:
-            # Scale oval proportionally to fit within canvas if needed
             canvas_bounds = self.canvas.bounds()
             canvas_width = canvas_bounds[2] - canvas_bounds[0]
             canvas_height = canvas_bounds[3] - canvas_bounds[1]
 
-            scale = min(canvas_width / width, canvas_height / height, 1.0)
-            width = width * scale
-            height = height * scale
-
-            # Center in canvas (override provided center)
-            cx = (canvas_bounds[0] + canvas_bounds[2]) / 2
-            cy = (canvas_bounds[1] + canvas_bounds[3]) / 2
+            # Normalize coordinates to 0-1 relative to canvas
+            # This assumes the bbox was defined in the same coordinate space as the canvas
+            # or is already intended to be relative.
+            # For density search, we want the pattern to be relative.
+            cx = (cx - canvas_bounds[0]) / canvas_width
+            cy = (cy - canvas_bounds[1]) / canvas_height
+            width = width / canvas_width
+            height = height / canvas_height
+            is_relative = True
 
         # Generate oval polygon points (ellipse approximation)
         num_segments = 64  # Enough for smooth appearance
@@ -126,7 +129,7 @@ class Oval(Primitive2D):
             coords = np.vstack([coords, coords[0:1]])
 
         polygon = Polygon(coords=coords)
-        return ShapePattern(polygon, name=self.name)
+        return ShapePattern(polygon, name=self.name, is_relative=is_relative)
 
 
 class RegularPolygon(Primitive2D):
@@ -249,21 +252,21 @@ class RegularPolygon(Primitive2D):
         cx, cy = self.center
         rotation = self.rotation
 
-        # If canvas is provided, adjust position and scale to fit
+        is_relative = False
+        # If canvas is provided, we treat the center and radius as relative to that canvas
         if self.canvas is not None:
-            # Scale polygon proportionally to fit within canvas if needed
             canvas_bounds = self.canvas.bounds()
             canvas_width = canvas_bounds[2] - canvas_bounds[0]
             canvas_height = canvas_bounds[3] - canvas_bounds[1]
 
-            # Current bounding box size (circumscribed circle diameter = 2 * radius)
-            current_size = 2 * radius
-            scale = min(canvas_width / current_size, canvas_height / current_size, 1.0)
-            radius = radius * scale
-
-            # Center in canvas (override provided center)
-            cx = (canvas_bounds[0] + canvas_bounds[2]) / 2
-            cy = (canvas_bounds[1] + canvas_bounds[3]) / 2
+            # Normalize coordinates to 0-1 relative to canvas
+            cx = (cx - canvas_bounds[0]) / canvas_width
+            cy = (cy - canvas_bounds[1]) / canvas_height
+            # Radius is tricky as it's 1D, we'll normalize it by width (arbitrary choice)
+            # but better to normalize x and y components if we had them.
+            # For now, let's assume uniform scaling.
+            radius = radius / canvas_width
+            is_relative = True
 
         # Generate regular polygon vertices
         # Start at angle 0 + rotation, evenly spaced around circle
@@ -278,4 +281,4 @@ class RegularPolygon(Primitive2D):
             coords = np.vstack([coords, coords[0:1]])
 
         polygon = Polygon(coords=coords)
-        return ShapePattern(polygon, name=self.name)
+        return ShapePattern(polygon, name=self.name, is_relative=is_relative)

@@ -14,8 +14,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from .geometry import Polyline
+if TYPE_CHECKING:
+    from .geometry import Canvas, Geometry
 
 
 @dataclass
@@ -32,8 +34,13 @@ class Pattern(ABC):
     """
 
     @abstractmethod
-    def to_geometry(self) -> Polyline:
-        """Convert pattern to renderable geometry."""
+    def to_geometry(self, canvas: Canvas | None = None) -> Geometry:
+        """Convert pattern to renderable geometry.
+
+        Args:
+            canvas: Optional canvas to resolve relative coordinates against.
+                If provided, the pattern will be scaled/positioned to fit.
+        """
         pass
 
     @abstractmethod
