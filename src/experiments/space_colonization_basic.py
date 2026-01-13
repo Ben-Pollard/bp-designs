@@ -83,6 +83,7 @@ def main():
             "max_thickness": 5.0,
             "taper_power": [0.2, 0.5, 0.8],
             "thickness_mode": ["all_nodes", "leaves_only"],
+            "render_mode": ["polyline", "polygon"],
             "taper_style": "smooth",
             "color": "black",
             "stroke_linecap": "round",

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 import svgwrite
 
-from bp_designs.core.geometry import Canvas, Polyline
+from bp_designs.core.geometry import Canvas, Polygon, Polyline
 from bp_designs.core.pattern import Pattern
 
 
@@ -15,47 +15,31 @@ from bp_designs.core.pattern import Pattern
 class BranchNetwork(Pattern):
     """Semantic structure for branching patterns.
 
-
-
     Internal Structure (Semantic):
-
 
         All arrays have length N (number of nodes).
 
-
         - positions: (N, 2) - Node positions
-
 
         - parents: (N,) - Parent indices (-1 for roots)
 
-
         - depths: (N,) - Hierarchy depth from root
-
 
         - branch_ids: (N,) - Which branch each node belongs to
 
-
         - timestamps: (N,) - Growth order (iteration when added)
-
-
 
     Pattern Interface:
 
-
         Exposes tree structure as queryable spatial fields:
-
 
         - 'distance': Distance to nearest node
 
-
         - 'depth': Interpolated hierarchy depth
-
 
         - 'branch_id': ID of nearest branch
 
-
         - 'density': Exponential falloff from branches
-
 
         - 'direction': Growth direction (returns (N, 2))
     """
@@ -72,7 +56,9 @@ class BranchNetwork(Pattern):
 
     thickness: np.ndarray | None = None  # (N,) - Optional stored thickness values
 
+    colors: np.ndarray | None = None  # (N,) - Optional stored color values (hex strings)
 
+    organs: dict[int, Organ] | None = None  # node_id -> Organ mapping
 
     def __post_init__(self):
         """Validate structure."""
@@ -194,53 +180,134 @@ class BranchNetwork(Pattern):
         self.thickness = thickness_values
         return thickness_values
 
-    def to_svg(
+    def to_polygon(
         self,
         thickness: str = 'descendant',
         min_thickness: float = 0.5,
         max_thickness: float = 5.0,
         taper_power: float = 0.5,
         thickness_mode: str = 'all_nodes',
-        taper_style: str = 'smooth',  # 'smooth' or 'blocky'
-        color: str = 'black',
-        stroke_linecap: str = 'round',
-        stroke_linejoin: str = 'round',
-        width: str | float = '100%',
-        height: str | float = '100%',
-        padding: float = 20,
         **kwargs
-    ) -> str:
-        """Render branch network to SVG with semantic thickness.
+    ) -> list[Polygon]:
+        """Convert network to a single unioned polygon skin.
 
-        Args:
-            thickness: Thickness strategy ('timestamp', 'hierarchy', 'descendant')
-            min_thickness: Minimum branch thickness
-            max_thickness: Maximum branch thickness
-            taper_power: Power law for descendant thickness
-            thickness_mode: Mode for descendant strategy ('all_nodes', 'leaves_only')
-            taper_style: 'smooth' for interpolated or 'blocky' for per-segment
-            color: Stroke color
-            stroke_linecap: SVG linecap style ('round', 'butt', 'square')
-            stroke_linejoin: SVG linejoin style ('round', 'miter', 'bevel')
-            width: SVG canvas width (default '100%' for responsive)
-            height: SVG canvas height (default '100%' for responsive)
-            padding: Padding around content
-            **kwargs: Additional SVG attributes
+        Uses shapely to union tapered envelopes of all segments.
 
         Returns:
-            SVG string
+            List of Polygon objects (one for each disconnected component)
         """
+        from shapely.geometry import Point as ShapelyPoint
+        from shapely.ops import unary_union
 
-
-        # Compute thickness for all nodes
-        # This returns an array of length N (one for each node)
-        # Use stored thickness if available and matches current request, otherwise compute
+        # 1. Get thickness values
         if self.thickness is not None and len(self.thickness) == len(self.node_ids):
             all_thickness = self.thickness
         else:
             all_thickness = self._compute_thickness_values(
                 thickness, min_thickness, max_thickness, taper_power, thickness_mode
             )
+
+        # 2. Create shapes for each segment
+        shapes = []
+        id_to_idx = {node_id: i for i, node_id in enumerate(self.node_ids)}
+
+        for i in range(len(self.node_ids)):
+            parent_id = self.parents[i]
+            pos = self.positions[i]
+            r = all_thickness[i] / 2.0
+
+            # Always add a circle for the node itself to ensure joints are covered
+            shapes.append(ShapelyPoint(pos).buffer(r))
+
+            if parent_id == -1 or parent_id not in id_to_idx:
+                continue
+
+            parent_idx = id_to_idx[parent_id]
+            parent_pos = self.positions[parent_idx]
+            parent_r = all_thickness[parent_idx] / 2.0
+
+            # Create tapered envelope as convex hull of the two circles
+            # This is mathematically equivalent to the external tangent trapezoid + end caps
+            c1 = ShapelyPoint(pos).buffer(r)
+            c2 = ShapelyPoint(parent_pos).buffer(parent_r)
+            envelope = unary_union([c1, c2]).convex_hull
+            shapes.append(envelope)
+
+        # 3. Union everything
+        combined = unary_union(shapes)
+
+        # 4. Convert back to our Polygon type
+        polygons = []
+        if combined.is_empty:
+            return []
+
+        if combined.geom_type == 'Polygon':
+            polygons.append(Polygon(coords=np.array(combined.exterior.coords)))
+        elif combined.geom_type == 'MultiPolygon':
+            for poly in combined.geoms:
+                polygons.append(Polygon(coords=np.array(poly.exterior.coords)))
+
+        return polygons
+
+    def to_svg(
+        self,
+        render_mode: str = 'polyline',  # 'polyline' or 'polygon'
+        thickness: str = 'descendant',
+        min_thickness: float = 0.5,
+        max_thickness: float = 5.0,
+        taper_power: float = 0.5,
+        thickness_mode: str = 'all_nodes',
+        taper_style: str = 'smooth',  # 'smooth' or 'blocky'
+        color: str | None = None,  # If None, uses self.colors or 'black'
+        color_strategy: str | None = None,
+        stroke_linecap: str = 'round',
+        stroke_linejoin: str = 'round',
+        width: str | float = '100%',
+        height: str | float = '100%',
+        padding: float = 20,
+        render_organs: bool = True,
+        **kwargs
+    ) -> str:
+        """Render branch network to SVG with semantic thickness and color.
+
+        Args:
+            render_mode: 'polyline' (traditional) or 'polygon' (organic skin)
+            thickness: Thickness strategy ('timestamp', 'hierarchy', 'descendant')
+            min_thickness: Minimum branch thickness
+            max_thickness: Maximum branch thickness
+            taper_power: Power law for descendant thickness
+            thickness_mode: Mode for descendant strategy ('all_nodes', 'leaves_only')
+            taper_style: 'smooth' for interpolated or 'blocky' for per-segment
+            color: Default color or None to use strategy
+            color_strategy: Color strategy name ('depth', 'random', etc.)
+            stroke_linecap: SVG linecap style ('round', 'butt', 'square')
+            stroke_linejoin: SVG linejoin style ('round', 'miter', 'bevel')
+            width: SVG canvas width (default '100%' for responsive)
+            height: SVG canvas height (default '100%' for responsive)
+            padding: Padding around content
+            render_organs: Whether to render attached organs
+            **kwargs: Additional SVG attributes
+
+        Returns:
+            SVG string
+        """
+
+        # Compute thickness for all nodes
+        if self.thickness is not None and len(self.thickness) == len(self.node_ids):
+            all_thickness = self.thickness
+        else:
+            all_thickness = self._compute_thickness_values(
+                thickness, min_thickness, max_thickness, taper_power, thickness_mode
+            )
+
+        # Compute colors for all nodes
+        if color_strategy is not None:
+            all_colors = self._compute_color_values(color_strategy, **kwargs)
+        elif self.colors is not None and len(self.colors) == len(self.node_ids):
+            all_colors = self.colors
+        else:
+            default_color = color if color is not None else 'black'
+            all_colors = np.full(len(self.node_ids), default_color, dtype=object)
 
         # Compute view box from bounds
         if self.pattern_bounds is not None:
@@ -271,6 +338,47 @@ class BranchNetwork(Pattern):
         )
 
 
+        if render_mode == 'polygon':
+            # Use the new organic skinning method
+            polygons = self.to_polygon(
+                thickness=thickness,
+                min_thickness=min_thickness,
+                max_thickness=max_thickness,
+                taper_power=taper_power,
+                thickness_mode=thickness_mode,
+                **kwargs
+            )
+            for poly in polygons:
+                # For polygon mode, we use the color of the first node as a fallback
+                # since the polygon is a union of many segments.
+                # In the future, we might want to support gradients or multi-polygon coloring.
+                fill_color = all_colors[0] if len(all_colors) > 0 else 'black'
+                dwg.add(dwg.polygon(
+                    points=[(float(x), float(y)) for x, y in poly.coords],
+                    fill=fill_color,
+                    **kwargs
+                ))
+
+            # Render organs if requested
+            if render_organs and self.organs:
+                id_to_idx = {node_id: i for i, node_id in enumerate(self.node_ids)}
+                for node_id, organ in self.organs.items():
+                    idx = id_to_idx.get(node_id)
+                    if idx is not None:
+                        # Compute orientation from parent
+                        angle = 0.0
+                        parent_id = self.parents[idx]
+                        if parent_id != -1:
+                            parent_idx = id_to_idx.get(parent_id)
+                            if parent_idx is not None:
+                                v = self.positions[idx] - self.positions[parent_idx]
+                                angle = np.degrees(np.arctan2(v[1], v[0]))
+
+                        organ.render_svg(dwg, self.positions[idx], all_colors[idx], orientation=angle)
+
+            return dwg.tostring()
+
+        # Traditional polyline/segment rendering
         # Smooth tapering: use path with varying stroke-width via opacity hack
         # Actually, SVG doesn't support varying stroke width along a path natively
         # So we render each segment separately with interpolated thickness
@@ -279,6 +387,7 @@ class BranchNetwork(Pattern):
         id_to_idx = {node_id: i for i, node_id in enumerate(self.node_ids)}
 
         for i in range(len(self.node_ids)):
+            node_color = all_colors[i]
             parent_id = self.parents[i]
             if parent_id == -1:
                 continue
@@ -318,7 +427,7 @@ class BranchNetwork(Pattern):
                             (float(p3[0]), float(p3[1])),
                             (float(p4[0]), float(p4[1])),
                         ],
-                        fill=color,
+                        fill=node_color,
                         **kwargs
                     )
                     dwg.add(poly)
@@ -329,13 +438,13 @@ class BranchNetwork(Pattern):
                     dwg.add(dwg.circle(
                         center=(float(start[0]), float(start[1])),
                         r=float(t_start / 2),
-                        fill=color,
+                        fill=node_color,
                         **kwargs
                     ))
                     dwg.add(dwg.circle(
                         center=(float(end[0]), float(end[1])),
                         r=float(t_end / 2),
-                        fill=color,
+                        fill=node_color,
                         **kwargs
                     ))
                 continue
@@ -347,7 +456,7 @@ class BranchNetwork(Pattern):
                 line = dwg.line(
                     start=(float(start[0]), float(start[1])),
                     end=(float(end[0]), float(end[1])),
-                    stroke=color,
+                    stroke=node_color,
                     stroke_width=t,
                     stroke_linecap=stroke_linecap,
                     stroke_linejoin=stroke_linejoin,
@@ -357,7 +466,83 @@ class BranchNetwork(Pattern):
                 raise ValueError(f"Unknown taper_style: {taper_style}")
 
 
+        # Render organs if requested
+        if render_organs and self.organs:
+            for node_id, organ in self.organs.items():
+                idx = id_to_idx.get(node_id)
+                if idx is not None:
+                    # Compute orientation from parent
+                    angle = 0.0
+                    parent_id = self.parents[idx]
+                    if parent_id != -1:
+                        parent_idx = id_to_idx.get(parent_id)
+                        if parent_idx is not None:
+                            v = self.positions[idx] - self.positions[parent_idx]
+                            angle = np.degrees(np.arctan2(v[1], v[0]))
+
+                    organ.render_svg(dwg, self.positions[idx], all_colors[idx], orientation=angle)
+
         return dwg.tostring()
+
+    def _compute_color_values(self, strategy_name: str, **kwargs) -> np.ndarray:
+        """Compute color for each node based on strategy."""
+        if strategy_name == 'depth':
+            strategy = DepthColorStrategy(**kwargs)
+        elif strategy_name == 'random':
+            strategy = RandomColorStrategy(**kwargs)
+        else:
+            raise ValueError(f"Unknown color strategy: {strategy_name}")
+
+        colors = strategy.compute_colors(self)
+        self.colors = colors
+        return colors
+
+    def attach_organs(
+        self,
+        organ_type: type[Organ],
+        distribution: str | OrganDistributionStrategy = 'terminal',
+        **kwargs
+    ):
+        """Attach organs to nodes using a distribution strategy.
+
+        Args:
+            organ_type: Class of organ to instantiate
+            distribution: Strategy name ('terminal', 'cluster', 'rhythmic') or strategy object
+            **kwargs: Arguments for organ constructor and distribution strategy
+        """
+        if self.organs is None:
+            self.organs = {}
+
+        distribution_params = kwargs.pop('distribution_params', {})
+        if isinstance(distribution, str):
+            if distribution == 'terminal':
+                strategy = TerminalDistribution()
+            elif distribution == 'cluster':
+                strategy = ClusterDistribution(**distribution_params)
+            elif distribution == 'rhythmic':
+                strategy = RhythmicDistribution(**distribution_params)
+            else:
+                raise ValueError(f"Unknown distribution strategy: {distribution}")
+        else:
+            strategy = distribution
+
+        # Distribution strategies return a list of (node_id, organ_instance)
+        # This allows one node to have multiple organs (clusters)
+        new_organs = strategy.generate_organs(self, organ_type, **kwargs)
+
+        # Since self.organs is a dict mapping node_id -> Organ,
+        # we need to handle multiple organs per node.
+        # For now, we'll use a list of organs per node if needed,
+        # but to keep the API consistent, let's use a MultiOrgan wrapper.
+        for node_id, organ in new_organs:
+            if node_id in self.organs:
+                existing = self.organs[node_id]
+                if isinstance(existing, MultiOrgan):
+                    existing.organs.append(organ)
+                else:
+                    self.organs[node_id] = MultiOrgan(organs=[existing, organ])
+            else:
+                self.organs[node_id] = organ
 
     # ============================================================================
 
@@ -916,3 +1101,266 @@ class DescendantThickness(BranchThicknessStrategy):
 
         thickness = self.min_thickness + count_normalized * (self.max_thickness - self.min_thickness)
         return thickness
+
+
+class Organ:
+    """Base class for organs (leaves, fruits) attached to the network."""
+
+    def render_svg(self, dwg: svgwrite.Drawing, position: np.ndarray, color: str, orientation: float = 0.0):
+        """Render organ to SVG."""
+        raise NotImplementedError
+
+
+class CircleOrgan(Organ):
+    """Simple circular organ (e.g., fruit or berry)."""
+
+    def __init__(self, radius: float = 2.0, fill: str | None = None):
+        self.radius = radius
+        self.fill = fill
+
+    def render_svg(self, dwg: svgwrite.Drawing, position: np.ndarray, color: str, orientation: float = 0.0):
+        fill_color = self.fill if self.fill is not None else color
+        dwg.add(dwg.circle(
+            center=(float(position[0]), float(position[1])),
+            r=self.radius,
+            fill=fill_color
+        ))
+
+
+class LeafOrgan(Organ):
+    """Simple leaf-shaped organ."""
+
+    def __init__(self, scale: float = 5.0, angle_offset: float = 0.0, fill: str | None = None, jitter: float = 0.0):
+        self.scale = scale
+        self.angle_offset = angle_offset
+        self.fill = fill
+        self.jitter = jitter
+
+    def render_svg(self, dwg: svgwrite.Drawing, position: np.ndarray, color: str, orientation: float = 0.0):
+        fill_color = self.fill if self.fill is not None else color
+
+        # Add some random jitter to orientation if requested
+        final_angle = orientation + self.angle_offset
+        if self.jitter > 0:
+            rng = np.random.default_rng(int(position[0] * 1000 + position[1]))
+            final_angle += rng.uniform(-self.jitter, self.jitter)
+
+        # Simple diamond/leaf shape
+        s = self.scale
+        points = [
+            (0, 0),
+            (s, s / 3),
+            (s * 1.5, 0),
+            (s, -s / 3)
+        ]
+        # Rotate and translate points
+        import math
+        rad = math.radians(final_angle)
+        cos_a = math.cos(rad)
+        sin_a = math.sin(rad)
+
+        transformed_points = []
+        for px, py in points:
+            tx = px * cos_a - py * sin_a + position[0]
+            ty = px * sin_a + py * cos_a + position[1]
+            transformed_points.append((float(tx), float(ty)))
+
+        dwg.add(dwg.polygon(points=transformed_points, fill=fill_color))
+
+
+class MultiOrgan(Organ):
+    """Wrapper for multiple organs at a single node."""
+    def __init__(self, organs: list[Organ]):
+        self.organs = organs
+
+    def render_svg(self, dwg: svgwrite.Drawing, position: np.ndarray, color: str, orientation: float = 0.0):
+        for organ in self.organs:
+            organ.render_svg(dwg, position, color, orientation)
+
+
+class BlossomOrgan(Organ):
+    """Multi-petal blossom (Ukiyo-e style)."""
+    def __init__(self, scale: float = 5.0, num_petals: int = 5, fill: str | None = None):
+        self.scale = scale
+        self.num_petals = num_petals
+        self.fill = fill
+
+    def render_svg(self, dwg: svgwrite.Drawing, position: np.ndarray, color: str, orientation: float = 0.0):
+        fill_color = self.fill if self.fill is not None else color
+        s = self.scale
+        for i in range(self.num_petals):
+            angle = (i * 360 / self.num_petals) + orientation
+            rad = np.radians(angle)
+            # Petal is a small circle offset from center
+            offset = s * 0.6
+            px = position[0] + np.cos(rad) * offset
+            py = position[1] + np.sin(rad) * offset
+            dwg.add(dwg.circle(center=(float(px), float(py)), r=s * 0.5, fill=fill_color))
+        # Center of blossom
+        dwg.add(dwg.circle(center=(float(position[0]), float(position[1])), r=s * 0.3, fill='white'))
+
+
+class StarOrgan(Organ):
+    """Geometric star organ (Islamic style)."""
+    def __init__(self, scale: float = 5.0, points: int = 8, fill: str | None = None):
+        self.scale = scale
+        self.points = points
+        self.fill = fill
+
+    def render_svg(self, dwg: svgwrite.Drawing, position: np.ndarray, color: str, orientation: float = 0.0):
+        fill_color = self.fill if self.fill is not None else color
+        s = self.scale
+        pts = []
+        for i in range(self.points * 2):
+            r = s if i % 2 == 0 else s * 0.4
+            angle = np.radians(i * 180 / self.points + orientation)
+            pts.append((
+                float(position[0] + np.cos(angle) * r),
+                float(position[1] + np.sin(angle) * r)
+            ))
+        dwg.add(dwg.polygon(points=pts, fill=fill_color))
+
+
+class DetailedLeafOrgan(Organ):
+    """Leaf with central vein (Botanical style)."""
+    def __init__(self, scale: float = 8.0, fill: str | None = None):
+        self.scale = scale
+        self.fill = fill
+
+    def render_svg(self, dwg: svgwrite.Drawing, position: np.ndarray, color: str, orientation: float = 0.0):
+        fill_color = self.fill if self.fill is not None else color
+        s = self.scale
+        rad = np.radians(orientation)
+        cos_a, sin_a = np.cos(rad), np.sin(rad)
+
+        # Leaf body
+        pts = [(0, 0), (s*0.5, s*0.3), (s, 0), (s*0.5, -s*0.3)]
+        t_pts = []
+        for px, py in pts:
+            t_pts.append((
+                float(px * cos_a - py * sin_a + position[0]),
+                float(px * sin_a + py * cos_a + position[1])
+            ))
+        dwg.add(dwg.polygon(points=t_pts, fill=fill_color, stroke='black', stroke_width=0.2))
+
+        # Central vein
+        vx = position[0] + cos_a * s
+        vy = position[1] + sin_a * s
+        dwg.add(dwg.line(start=(float(position[0]), float(position[1])), end=(float(vx), float(vy)), stroke='black', stroke_width=0.3))
+
+
+class OffsetOrgan(Organ):
+    """Wrapper that adds a spatial offset to an organ."""
+    def __init__(self, organ: Organ, offset: np.ndarray):
+        self.organ = organ
+        self.offset = offset
+
+    def render_svg(self, dwg: svgwrite.Drawing, position: np.ndarray, color: str, orientation: float = 0.0):
+        self.organ.render_svg(dwg, position + self.offset, color, orientation)
+
+
+class OrganDistributionStrategy:
+    """Base class for determining where to place organs."""
+    def generate_organs(self, network: BranchNetwork, organ_type: type[Organ], **kwargs) -> list[tuple[int, Organ]]:
+        raise NotImplementedError
+
+
+class TerminalDistribution(OrganDistributionStrategy):
+    """Place one organ at each leaf node."""
+    def generate_organs(self, network: BranchNetwork, organ_type: type[Organ], **kwargs) -> list[tuple[int, Organ]]:
+        leaves = network.get_leaves()
+        return [(network.node_ids[idx], organ_type(**kwargs)) for idx in leaves]
+
+
+class ClusterDistribution(OrganDistributionStrategy):
+    """Place multiple organs around leaf nodes with random offsets."""
+    def __init__(self, count: int = 3, radius: float = 5.0, **kwargs):
+        self.count = count
+        self.radius = radius
+
+    def generate_organs(self, network: BranchNetwork, organ_type: type[Organ], **kwargs) -> list[tuple[int, Organ]]:
+        leaves = network.get_leaves()
+        results = []
+        rng = np.random.default_rng(42)
+        for idx in leaves:
+            node_id = network.node_ids[idx]
+            for _ in range(self.count):
+                angle = rng.uniform(0, 360)
+                dist = rng.uniform(0, self.radius)
+                offset = np.array([np.cos(np.radians(angle)) * dist, np.sin(np.radians(angle)) * dist])
+
+                organ_instance = organ_type(**kwargs)
+                results.append((node_id, OffsetOrgan(organ=organ_instance, offset=offset)))
+        return results
+
+
+class RhythmicDistribution(OrganDistributionStrategy):
+    """Place organs at regular depth intervals."""
+    def __init__(self, interval: int = 5, **kwargs):
+        self.interval = interval
+
+    def generate_organs(self, network: BranchNetwork, organ_type: type[Organ], **kwargs) -> list[tuple[int, Organ]]:
+        depths = network._compute_depths(network.parents)
+        results = []
+        for i, d in enumerate(depths):
+            if d > 0 and d % self.interval == 0:
+                results.append((network.node_ids[i], organ_type(**kwargs)))
+        return results
+
+
+class ColorStrategy:
+    """Base class for computing node colors."""
+
+    def compute_colors(self, network: BranchNetwork) -> np.ndarray:
+        raise NotImplementedError
+
+
+class DepthColorStrategy(ColorStrategy):
+    """Color based on hierarchy depth."""
+
+    def __init__(self, start_color: str = '#4a2c2a', end_color: str = '#2d5a27'):
+        self.start_color = start_color
+        self.end_color = end_color
+
+    def compute_colors(self, network: BranchNetwork) -> np.ndarray:
+        depths = network._compute_depths(network.parents)
+        max_depth = depths.max() if len(depths) > 0 else 1
+
+        # Simple hex interpolation
+        def interpolate_color(c1, c2, t):
+            def hex_to_rgb(h):
+                h = h.lstrip('#')
+                return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+
+            rgb1 = hex_to_rgb(c1)
+            rgb2 = hex_to_rgb(c2)
+            res = tuple(int(rgb1[i] + (rgb2[i] - rgb1[i]) * t) for i in range(3))
+            return f'#{res[0]:02x}{res[1]:02x}{res[2]:02x}'
+
+        colors = []
+        for d in depths:
+            t = d / max_depth
+            colors.append(interpolate_color(self.start_color, self.end_color, t))
+        return np.array(colors, dtype=object)
+
+
+class RandomColorStrategy(ColorStrategy):
+    """Random variation around a base color."""
+
+    def __init__(self, base_color: str = '#2d5a27', variation: float = 0.1):
+        self.base_color = base_color
+        self.variation = variation
+
+    def compute_colors(self, network: BranchNetwork) -> np.ndarray:
+        def hex_to_rgb(h):
+            h = h.lstrip('#')
+            return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+
+        base_rgb = hex_to_rgb(self.base_color)
+        colors = []
+        rng = np.random.default_rng()
+        for _ in range(len(network.node_ids)):
+            v = rng.uniform(-self.variation, self.variation, 3)
+            res = tuple(max(0, min(255, int(base_rgb[i] * (1 + v[i])))) for i in range(3))
+            colors.append(f'#{res[0]:02x}{res[1]:02x}{res[2]:02x}')
+        return np.array(colors, dtype=object)
