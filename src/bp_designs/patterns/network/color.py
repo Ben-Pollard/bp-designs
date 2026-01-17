@@ -32,9 +32,14 @@ class ColorStrategy:
 class DepthColorStrategy(ColorStrategy):
     """Color based on hierarchy depth."""
 
-    def __init__(self, start_color: str = "#4a2c2a", end_color: str = "#2d5a27", **kwargs):
-        self.start_color = Color.from_hex(start_color)
-        self.end_color = Color.from_hex(end_color)
+    def __init__(
+        self,
+        start_color: str | Color = "#4a2c2a",
+        end_color: str | Color = "#2d5a27",
+        **kwargs,
+    ):
+        self.start_color = start_color if isinstance(start_color, Color) else Color.from_hex(start_color)
+        self.end_color = end_color if isinstance(end_color, Color) else Color.from_hex(end_color)
 
     def compute_colors(self, network: BranchNetwork) -> np.ndarray:
         depths = network.depths
@@ -50,8 +55,8 @@ class DepthColorStrategy(ColorStrategy):
 class RandomColorStrategy(ColorStrategy):
     """Random variation around a base color."""
 
-    def __init__(self, base_color: str = "#2d5a27", variation: float = 0.1, **kwargs):
-        self.base_color = Color.from_hex(base_color)
+    def __init__(self, base_color: str | Color = "#2d5a27", variation: float = 0.1, **kwargs):
+        self.base_color = base_color if isinstance(base_color, Color) else Color.from_hex(base_color)
         self.variation = variation
 
     def compute_colors(self, network: BranchNetwork) -> np.ndarray:

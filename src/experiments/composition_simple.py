@@ -62,7 +62,7 @@ def main():
     # Define parameter space
     space = ParameterSpace(
         name="composition_simple",
-        pattern={
+        specs={
             "seed": [42, 123, 456],  # 3 seeds for variety
             "num_attractions": [500],  # Just one value
             "num_sites": [30],  # Just one value
@@ -72,7 +72,6 @@ def main():
             "relaxation_iterations": 2,
             "render_mode": "edges",
         },
-        render={},  # Use runner defaults for SVG rendering
     )
 
     # Generate grid

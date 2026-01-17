@@ -20,6 +20,7 @@
   - [ ] Future: Move to 3D for advanced lighting
 - [x] Generated organs
   - [x] Refactored to OrganPattern/OrganGenerator architecture
+  - [x] Procedural blossoms (multi-ring, organic petal shapes)
 - [x] Background
   - [x] Support for background_color in Canvas and to_svg
   - [x] Coupled background colors via ParameterSpace

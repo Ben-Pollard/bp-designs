@@ -272,6 +272,7 @@ class TestSpaceColonization:
         margin = 1e-6
         # Use shapely to get bounds from the resolved geometry
         from shapely.geometry import Polygon as ShapelyPolygon
+
         geom = small_boundary.to_geometry(self.canvas)
         poly = ShapelyPolygon(geom.polylines[0])
         xmin, ymin, xmax, ymax = poly.bounds
@@ -302,7 +303,7 @@ class TestSpaceColonization:
 
     def test_edge_case_small_boundary(self):
         """Test with very small boundary."""
-        tiny_boundary = Oval.from_width_height(5,5).generate_pattern()
+        tiny_boundary = Oval.from_width_height(5, 5).generate_pattern()
 
         generator = SpaceColonization(
             canvas=self.canvas,
@@ -339,9 +340,7 @@ class TestSpaceColonization:
         valid_node_ids = set(network.node_ids)
         for node_id, parent_id in zip(network.node_ids, network.parents, strict=True):
             if parent_id != -1:
-                assert parent_id in valid_node_ids, (
-                    f"Parent {parent_id} not found for node {node_id}"
-                )
+                assert parent_id in valid_node_ids, f"Parent {parent_id} not found for node {node_id}"
 
         # Check timestamps: root should have timestamp 0, children should have increasing timestamps
         assert network.timestamps[0] == 0  # Root timestamp

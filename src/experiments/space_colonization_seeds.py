@@ -40,7 +40,7 @@ def main():
     # Define parameter space
     space = ParameterSpace(
         name="space_colonization_seeds",
-        pattern={
+        specs={
             "seed": list(range(20)),  # 20 different seeds
             "num_attractions": 500,
             "kill_distance": 5.0,
@@ -51,7 +51,6 @@ def main():
             "final_boundary": boundary,
             "max_iterations": 1000,
         },
-        render={},  # Use runner defaults for SVG rendering
     )
 
     # Generate grid

@@ -76,20 +76,18 @@ class TestExperimentRunner:
         # Create a simple parameter space
         space = ParameterSpace(
             name="test_space",
-            pattern={
+            specs={
                 "param1": [1, 2, 3],
                 "param2": (0.0, 1.0, 3),  # Linear spacing
                 "fixed_param": "constant",
             },
-            render={},
         )
 
         grid = space.to_grid()
 
         assert grid.space_name == "test_space"
         assert len(grid) == 9  # 3 × 3 combinations
-        assert set(grid.pattern_param_names) == {"param1", "param2", "fixed_param"}
-        assert grid.render_param_names == []
+        assert set(grid.param_names) == {"param1", "param2", "fixed_param"}
 
         # Test iteration
         combinations = list(grid)
@@ -130,14 +128,13 @@ class TestExperimentRunner:
 
         space = ParameterSpace(
             name="test_run",
-            pattern={
+            specs={
                 "seed": [1, 2, 3],
                 "size": 100,
                 "canvas": canvas,
                 "root_position": root_position,
                 "boundary": boundary,
             },
-            render={},
         )
         grid = space.to_grid()
 
@@ -145,8 +142,9 @@ class TestExperimentRunner:
         class MockPattern:
             def __init__(self, points):
                 self.points = points
+
             def to_svg(self, **kwargs):
-                return '<svg></svg>'
+                return "<svg></svg>"
 
         def mock_generator(params):
             # Return a simple pattern based on seed
@@ -219,8 +217,7 @@ class TestExperimentRunner:
         # Create parameter grid
         space = ParameterSpace(
             name="test_failures",
-            pattern={"mode": ["success", "fail"]},
-            render={},
+            specs={"mode": ["success", "fail"]},
         )
         grid = space.to_grid()
 
@@ -228,8 +225,9 @@ class TestExperimentRunner:
         class MockPattern:
             def __init__(self, points):
                 self.points = points
+
             def to_svg(self, **kwargs):
-                return '<svg></svg>'
+                return "<svg></svg>"
 
         def mock_generator(params):
             if params["mode"] == "fail":
@@ -266,16 +264,16 @@ class TestExperimentRunner:
 
         space = ParameterSpace(
             name="test_dict_result",
-            pattern={"value": [1, 2]},
-            render={},
+            specs={"value": [1, 2]},
         )
         grid = space.to_grid()
 
         class MockPattern:
             def __init__(self, points):
                 self.points = points
+
             def to_svg(self, **kwargs):
-                return '<svg></svg>'
+                return "<svg></svg>"
 
         def mock_generator(params):
             value = params["value"]
@@ -294,29 +292,27 @@ class TestExperimentRunner:
             assert metadata["params"]["value"] == 1
             assert metadata["svg_path"] == "outputs/var_0001.svg"
 
-    def test_run_experiment_with_numpy_metadata(
-        self, experiment_runner_factory, temp_experiment_dirs
-    ):
+    def test_run_experiment_with_numpy_metadata(self, experiment_runner_factory, temp_experiment_dirs):
         """Test handling of numpy arrays in metadata."""
 
         output_dir, gallery_dir = temp_experiment_dirs
 
         space = ParameterSpace(
             name="test_numpy_metadata",
-            pattern={
+            specs={
                 "id": [1],
                 "array_data": np.array([1, 2, 3]),
                 "scalar_data": np.float64(42.5),
             },
-            render={},
         )
         grid = space.to_grid()
 
         class MockPattern:
             def __init__(self, points):
                 self.points = points
+
             def to_svg(self, **kwargs):
-                return '<svg></svg>'
+                return "<svg></svg>"
 
         def mock_generator(params):
             return MockPattern(np.array([[0, 0], [10, 10]]))
@@ -337,7 +333,7 @@ class TestExperimentRunner:
     @patch.object(ExperimentRunner, "_update_experiments_index")
     def test_experiment_index_update(self, mock_update_index, experiment_runner_factory):
         """Test that experiments index is updated."""
-        space = ParameterSpace(name="test_index", pattern={"x": [1]}, render={})
+        space = ParameterSpace(name="test_index", specs={"x": [1]})
         grid = space.to_grid()
 
         runner = experiment_runner_factory(
@@ -347,8 +343,9 @@ class TestExperimentRunner:
         class MockPattern:
             def __init__(self, points):
                 self.points = points
+
             def to_svg(self, **kwargs):
-                return '<svg></svg>'
+                return "<svg></svg>"
 
         def mock_generator(params):
             return MockPattern(np.array([[0, 0], [10, 10]]))
@@ -369,8 +366,7 @@ class TestExperimentRunner:
 
         space = ParameterSpace(
             name="test_max_variants",
-            pattern={"x": list(range(10))},  # 10 values
-            render={},
+            specs={"x": list(range(10))},  # 10 values
         )
         grid = space.to_grid()
 
@@ -379,8 +375,9 @@ class TestExperimentRunner:
         class MockPattern:
             def __init__(self, points):
                 self.points = points
+
             def to_svg(self, **kwargs):
-                return '<svg></svg>'
+                return "<svg></svg>"
 
         def mock_generator(params):
             nonlocal call_count
@@ -405,7 +402,7 @@ class TestExperimentRunner:
     def test_empty_parameter_grid(self, experiment_runner_factory):
         """Test handling of empty parameter grid."""
         # Create empty parameter space
-        space = ParameterSpace(name="test_empty", pattern={}, render={})
+        space = ParameterSpace(name="test_empty", specs={})
         grid = space.to_grid()
 
         # Empty pattern produces one combination (empty parameter set)
@@ -417,8 +414,9 @@ class TestExperimentRunner:
         class MockPattern:
             def __init__(self, points):
                 self.points = points
+
             def to_svg(self, **kwargs):
-                return '<svg></svg>'
+                return "<svg></svg>"
 
         def mock_generator(params):
             return MockPattern(np.array([[0, 0], [10, 10]]))
@@ -432,7 +430,7 @@ class TestExperimentRunner:
 
     def test_generator_returns_non_geometry(self, experiment_runner_factory):
         """Test error when generator doesn't return geometry."""
-        space = ParameterSpace(name="test_bad_return", pattern={"x": [1]}, render={})
+        space = ParameterSpace(name="test_bad_return", specs={"x": [1]})
         grid = space.to_grid()
 
         runner = experiment_runner_factory(experiment_name="test_bad_return")
@@ -445,6 +443,4 @@ class TestExperimentRunner:
         # Should record failure
         assert summary["successful"] == 0
         assert summary["failed"] == 1
-        assert (
-            "to_svg" in summary["failures"][0]["error"]
-        )  # AttributeError about missing to_svg method
+        assert "to_svg" in summary["failures"][0]["error"]  # AttributeError about missing to_svg method

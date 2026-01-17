@@ -13,7 +13,7 @@ from .pattern import Pattern
 from .renderer import RenderingContext
 
 if TYPE_CHECKING:
-    pass
+    from bp_designs.core.lighting import LightingModel
 
 
 @dataclass
@@ -42,11 +42,14 @@ class Scene(Pattern):
         # Render background from canvas
         if self.canvas.background_color:
             xmin, ymin, xmax, ymax = self.canvas.bounds()
+            fill = self.canvas.background_color
+            if context.lighting:
+                fill = context.lighting.get_fill(fill, {"type": "background"})
             context.add(
                 context.dwg.rect(
                     insert=(xmin, ymin),
                     size=(xmax - xmin, ymax - ymin),
-                    fill=self.canvas.background_color,
+                    fill=str(fill),
                 )
             )
 
@@ -88,7 +91,9 @@ class Scene(Pattern):
             size=(format_size(width), format_size(height)),
             viewBox=f"{xmin} {ymin} {view_width} {view_height}",
         )
-        context = RenderingContext(dwg)
+
+        lighting: LightingModel | None = kwargs.get("lighting")
+        context = RenderingContext(dwg, lighting=lighting)
         self.render(context, **kwargs)
 
         svg_string = dwg.tostring()

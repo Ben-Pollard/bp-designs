@@ -135,9 +135,7 @@ class TestVoronoiTessellation:
     def test_canvas_bounds(self):
         """Test that all vertices are within or near canvas bounds."""
         width, height = 100.0, 150.0
-        generator = VoronoiTessellation(
-            seed=42, num_sites=20, width=width, height=height, render_mode="both"
-        )
+        generator = VoronoiTessellation(seed=42, num_sites=20, width=width, height=height, render_mode="both")
         geometry = generator.generate_pattern().to_geometry()
 
         # Allow small margin for numerical precision and clipping

@@ -12,24 +12,24 @@ import numpy as np
 
 @dataclass
 class ParameterSpace:
-    """Define parameter spaces for pattern generation and rendering.
+    """Define parameter spaces for systematic experimentation.
 
     Supports multiple sampling strategies:
     - Linear spacing (linspace)
     - Logarithmic spacing (logspace)
     - Explicit value lists
 
-    Parameters are categorized as pattern (for pattern generation) or
-    render (for SVG rendering). Each category is a dict mapping parameter
+    Parameters are defined in a unified 'specs' dictionary mapping parameter
     names to specifications:
     - List of explicit values [v1, v2, ...]
     - Tuple (min, max, steps) for linear spacing
     - Single value for fixed parameter
+
+    Namespacing can be achieved using dot-notation in keys (e.g., 'trunk.length').
     """
 
     name: str
-    pattern: dict[str, Any]
-    render: dict[str, Any]
+    specs: dict[str, Any]
     derived: dict[str, Callable[[dict[str, Any]], Any]] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -63,51 +63,33 @@ class ParameterSpace:
         Returns:
             ParameterGrid with all combinations
         """
-        # Expand pattern parameters
-        expanded_pattern = {}
-        for param_name, spec in self.pattern.items():
-            expanded_pattern[param_name] = self.expand_spec(param_name, spec)
+        # Expand all specifications
+        expanded = {}
+        for param_name, spec in self.specs.items():
+            expanded[param_name] = self.expand_spec(param_name, spec)
 
-        # Expand render parameters
-        expanded_render = {}
-        for param_name, spec in self.render.items():
-            expanded_render[param_name] = self.expand_spec(param_name, spec)
+        # Generate all combinations of independent parameters
+        param_names = list(expanded.keys())
+        param_values = [expanded[name] for name in param_names]
 
-        # Generate pattern combinations
-        pattern_names = list(expanded_pattern.keys())
-        pattern_values = [expanded_pattern[name] for name in pattern_names]
-        pattern_combinations = []
-        for values in product(*pattern_values):
-            pattern_combinations.append(dict(zip(pattern_names, values, strict=False)))
-
-        # Generate render combinations
-        render_names = list(expanded_render.keys())
-        render_values = [expanded_render[name] for name in render_names]
-        render_combinations = []
-        for values in product(*render_values):
-            render_combinations.append(dict(zip(render_names, values, strict=False)))
-
-        # Cross product: combine each pattern combo with each render combo
         combinations = []
-        for pattern_combo in pattern_combinations:
-            for render_combo in render_combinations:
-                combo = {**pattern_combo, **render_combo}
+        for values in product(*param_values):
+            combo = dict(zip(param_names, values, strict=False))
 
-                # Apply derived parameters
-                for derived_name, fn in self.derived.items():
-                    try:
-                        combo[derived_name] = fn(combo)
-                    except Exception as e:
-                        # If a derived parameter fails, we might want to know why
-                        # but for now we'll just set it to None or skip
-                        combo[derived_name] = f"Error: {e}"
+            # Apply derived parameters
+            for derived_name, fn in self.derived.items():
+                try:
+                    combo[derived_name] = fn(combo)
+                except Exception as e:
+                    # If a derived parameter fails, we might want to know why
+                    # but for now we'll just set it to None or skip
+                    combo[derived_name] = f"Error: {e}"
 
-                combinations.append(combo)
+            combinations.append(combo)
 
         return ParameterGrid(
             space_name=self.name,
-            pattern_param_names=pattern_names,
-            render_param_names=render_names,
+            param_names=param_names,
             derived_param_names=list(self.derived.keys()),
             combinations=combinations,
         )
@@ -121,8 +103,7 @@ class ParameterGrid:
     """
 
     space_name: str
-    pattern_param_names: list[str]
-    render_param_names: list[str]
+    param_names: list[str]
     combinations: list[dict[str, Any]]
     derived_param_names: list[str] = field(default_factory=list)
 
@@ -150,7 +131,7 @@ class ParameterGrid:
         ]
 
         # Combine all parameter names
-        all_param_names = self.pattern_param_names + self.render_param_names + self.derived_param_names
+        all_param_names = self.param_names + self.derived_param_names
 
         # Separate variable and fixed parameters
         variable_params = []
@@ -187,15 +168,36 @@ class ParameterGrid:
             for param, value in fixed_params:
                 lines.append(f"  {param}: {value}")
 
-        # Add section headers for pattern vs render if needed
-        if self.pattern_param_names or self.render_param_names or self.derived_param_names:
+        # Add section headers for categories if needed
+        if self.param_names or self.derived_param_names:
             lines.append("")
             lines.append("Parameter categories:")
-            if self.pattern_param_names:
-                lines.append(f"  Pattern parameters: {len(self.pattern_param_names)}")
-            if self.render_param_names:
-                lines.append(f"  Render parameters: {len(self.render_param_names)}")
+            if self.param_names:
+                lines.append(f"  Independent parameters: {len(self.param_names)}")
             if self.derived_param_names:
                 lines.append(f"  Derived parameters: {len(self.derived_param_names)}")
 
         return "\n".join(lines)
+
+
+def split_params(params: dict[str, Any], namespace: str | None = None) -> dict[str, Any]:
+    """Extract parameters for a specific namespace.
+
+    Args:
+        params: Flat dictionary of parameters (potentially namespaced with dots)
+        namespace: Namespace to extract (e.g., 'trunk'). If None, returns all
+                   non-namespaced parameters.
+
+    Returns:
+        Dictionary of parameters with the namespace prefix removed.
+    """
+    result = {}
+    for k, v in params.items():
+        if namespace:
+            prefix = f"{namespace}."
+            if k.startswith(prefix):
+                result[k[len(prefix) :]] = v
+        else:
+            if "." not in k:
+                result[k] = v
+    return result

@@ -24,6 +24,7 @@ class Primitive2D(Generator):
     For something simple like a circle that could just be passing the centre Point and radius
     through the Pattern
     """
+
     pass
 
 

@@ -29,15 +29,14 @@ def main():
     # Define parameter space
     space = ParameterSpace(
         name="regular_polygon_basic",
-        pattern={
+        specs={
             "sides": [3, 4, 5, 6, 8],  # triangle, square, pentagon, hexagon, octagon
             "radius": [20.0, 30.0, 40.0],  # different sizes
-            "rotation": [0.0, np.pi/12, np.pi/6],  # 0°, 15°, 30°
+            "rotation": [0.0, np.pi / 12, np.pi / 6],  # 0°, 15°, 30°
             "canvas": canvas,
             "center": (50.0, 50.0),  # center in canvas
             "name": None,  # auto-generated name
         },
-        render={},  # Use runner defaults for SVG rendering
     )
 
     # Generate grid

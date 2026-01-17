@@ -94,7 +94,10 @@ class ShapePattern(Pattern):
         if not isinstance(other, ShapePattern):
             return False
         # Compare coordinate arrays using np.array_equal
-        return np.array_equal(self.polygon.coords, other.polygon.coords) and self.is_relative == other.is_relative
+        return (
+            np.array_equal(self.polygon.coords, other.polygon.coords)
+            and self.is_relative == other.is_relative
+        )
 
     def __hash__(self) -> int:
         """Hash based on polygon coordinates."""

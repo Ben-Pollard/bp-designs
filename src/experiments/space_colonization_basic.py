@@ -3,7 +3,6 @@
 Explores key parameters: attraction_distance, num_attractions, segment_length.
 """
 
-
 from bp_designs.core.geometry import Canvas
 from bp_designs.experiment.params import ParameterGrid, ParameterSpace
 from bp_designs.experiment.runner import ExperimentRunner
@@ -63,10 +62,10 @@ def main():
         Canvas.from_size(200),
     ]
 
-    # Define parameter space with pattern and render parameters
+    # Define parameter space with unified specs
     space = ParameterSpace(
         name="space_colonization_density_search",
-        pattern={
+        specs={
             "num_attractions": [500],
             "segment_length": [2.0],
             "initial_boundary": boundaries,
@@ -76,8 +75,6 @@ def main():
             "seed": 42,
             "canvas": canvases,  # Varying canvas size explores density
             "max_iterations": 1000,
-        },
-        render={
             "thickness": "descendant",
             "min_thickness": [0.1, 0.5],  # 2 values
             "max_thickness": 5.0,
@@ -102,14 +99,14 @@ def main():
     # Use systematic sampling: take every nth combination
     # Use random sampling to ensure all parameter combinations (like canvas size) are represented
     import random
+
     n_samples = 30
     random.seed(42)
     sampled_indices = random.sample(range(len(full_grid)), min(n_samples, len(full_grid)))
     sampled_indices.sort()
     sampled_grid = ParameterGrid(
         space_name=f"{space.name}_sampled",
-        pattern_param_names=full_grid.pattern_param_names,
-        render_param_names=full_grid.render_param_names,
+        param_names=full_grid.param_names,
         combinations=[full_grid[i] for i in sampled_indices],
     )
 

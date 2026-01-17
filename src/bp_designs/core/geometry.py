@@ -74,18 +74,19 @@ class Canvas(Polygon):
 
     @classmethod
     def from_width_height(cls, width: int, height: int):
-        coords = np.array([
-            [0.0, 0.0],
-            [width, 0.0],
-            [width, height],
-            [0.0, height],
-            [0.0, 0.0],  # Close the polygon
-        ])
+        coords = np.array(
+            [
+                [0.0, 0.0],
+                [width, 0.0],
+                [width, height],
+                [0.0, height],
+                [0.0, 0.0],  # Close the polygon
+            ]
+        )
         return cls(coords=coords)
 
     @classmethod
     def from_size(cls, size: int):
-
         return cls.from_width_height(size, size)
 
 
@@ -97,4 +98,3 @@ class Mesh(Geometry):
 @dataclass
 class Polyline(Geometry):
     polylines: list[np.ndarray]
-

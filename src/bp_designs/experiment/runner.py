@@ -200,7 +200,7 @@ class ExperimentRunner:
                 metadata_path.write_text(json.dumps(metadata, indent=2))
 
                 # Export network data for debugging
-                if hasattr(result, 'node_ids'):
+                if hasattr(result, "node_ids"):
                     data_path = self.outputs_dir / f"{variant_id}_data.json"
                     network_data = {
                         "node_ids": result.node_ids.tolist(),

@@ -22,7 +22,7 @@ class CellsStyle(RenderStyle):
     stroke_linejoin: str = "round"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Cells(Pattern):
     """Voronoi tessellation pattern implementing Pattern interface.
 
@@ -222,9 +222,7 @@ class Cells(Pattern):
 
             for simplex in self.vor.ridge_vertices:
                 if -1 not in simplex:
-                    edge_points.extend(
-                        [self.vor.vertices[simplex[0]], self.vor.vertices[simplex[1]]]
-                    )
+                    edge_points.extend([self.vor.vertices[simplex[0]], self.vor.vertices[simplex[1]]])
 
             if edge_points:
                 self._edge_kdtree = KDTree(np.array(edge_points))
@@ -490,9 +488,7 @@ class Cells(Pattern):
                     if not current_inside:
                         # Entering: add intersection point
 
-                        intersection = self._line_plane_intersection(
-                            current, next_vertex, (bx, by), (nx, ny)
-                        )
+                        intersection = self._line_plane_intersection(current, next_vertex, (bx, by), (nx, ny))
 
                         if intersection is not None:
                             output.append(intersection)
@@ -503,9 +499,7 @@ class Cells(Pattern):
                 elif current_inside:
                     # Leaving: add intersection point
 
-                    intersection = self._line_plane_intersection(
-                        current, next_vertex, (bx, by), (nx, ny)
-                    )
+                    intersection = self._line_plane_intersection(current, next_vertex, (bx, by), (nx, ny))
 
                     if intersection is not None:
                         output.append(intersection)

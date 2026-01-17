@@ -24,18 +24,15 @@ from bp_designs.experiment import ParameterSpace
 
 space = ParameterSpace(
     name="my_exploration",
-    ranges={
+    specs={
         # Explicit values
         "attraction_distance": [30.0, 50.0, 70.0],
-
         # Linear range: (min, max, num_steps)
         "segment_length": (1.0, 4.0, 4),  # [1.0, 2.0, 3.0, 4.0]
-
         # List of values
         "num_attractions": [100, 200, 500, 1000],
-    },
-    fixed={
-        "seed": 42,  # Fixed across all variants
+        # Fixed values
+        "seed": 42,
         "width": 100.0,
         "height": 100.0,
     },
@@ -114,10 +111,8 @@ experiments/
 ### Explore one parameter at a time
 Fix all but one parameter to isolate effects:
 ```python
-ranges={
+specs={
     "attraction_distance": [20, 30, 40, 50, 60, 70, 80],
-},
-fixed={
     "num_attractions": 500,
     "segment_length": 2.0,
     "seed": 42,
@@ -127,7 +122,7 @@ fixed={
 ### Explore interactions (2-3 parameters)
 Test combinations of related parameters:
 ```python
-ranges={
+specs={
     "attraction_distance": [30, 50, 70],
     "kill_distance": [3, 5, 7],
     "segment_length": [1, 2, 4],
@@ -138,10 +133,8 @@ ranges={
 ### Seed diversity
 See natural variation at fixed parameters:
 ```python
-ranges={
+specs={
     "seed": list(range(50)),  # 50 different seeds
-},
-fixed={
     # All other params fixed
 }
 ```

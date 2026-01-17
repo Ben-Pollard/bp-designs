@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from .scene import Layer
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Pattern(ABC):
     """Interface for patterns that can be spatially queried and rendered.
 

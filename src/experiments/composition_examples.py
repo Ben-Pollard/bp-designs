@@ -87,7 +87,7 @@ def main():
     # Define parameter space
     space = ParameterSpace(
         name="composition_examples",
-        pattern={
+        specs={
             "composition_type": ["guided", "textured", "blended"],
             "seed": [42, 123, 456],  # 3 seeds for variety
             "num_attractions": [500, 1000],  # 2 values - higher for better growth
@@ -103,7 +103,6 @@ def main():
             "channel_a": "density",
             "channel_b": "boundary_distance",
         },
-        render={},  # Use runner defaults for SVG rendering
     )
 
     # Generate grid

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from bp_designs.core.color import Color
 from bp_designs.core.geometry import Canvas, Polygon, Polyline
 from bp_designs.core.renderer import RenderStyle
 from bp_designs.patterns.network.color import ColorStrategy
@@ -26,7 +27,7 @@ class NetworkStyle(RenderStyle):
     taper_power: float = 0.5
     thickness_mode: str = "all_nodes"
     taper_style: str = "smooth"
-    color: str | None = None
+    color: str | Color | None = None
     color_strategy: str | None = None
     stroke_linecap: str = "round"
     stroke_linejoin: str = "round"
@@ -35,8 +36,8 @@ class NetworkStyle(RenderStyle):
     shading: str | None = None
     organ_color_override: bool = False
     debug_organs: bool = False
-    start_color: str = "#4a2c2a"
-    end_color: str = "#2d5a27"
+    start_color: str | Color = "#4a2c2a"
+    end_color: str | Color = "#2d5a27"
 
 
 class NetworkRenderer:
@@ -157,13 +158,15 @@ class NetworkRenderer:
 
         if style.color_strategy is not None:
             strategy = ColorStrategy.from_name(
-                style.color_strategy, start_color=style.start_color, end_color=style.end_color
+                style.color_strategy,
+                start_color=style.start_color,
+                end_color=style.end_color,
             )
             all_colors = strategy.compute_colors(self.network)
         elif self.network.colors is not None and len(self.network.colors) == len(self.network.node_ids):
             all_colors = self.network.colors
         else:
-            default_color = style.color if style.color is not None else "black"
+            default_color = style.color if style.color is not None else "#000000"
             all_colors = np.full(len(self.network.node_ids), default_color, dtype=object)
 
         svg_attrs = style.get_svg_attributes()
@@ -171,8 +174,8 @@ class NetworkRenderer:
         fill_override = None
         if style.shading == "linear" and style.color_strategy == "depth":
             gradient = context.dwg.linearGradient(id="depth_gradient", x1="0%", y1="0%", x2="0%", y2="100%")
-            gradient.add_stop_color(offset="0%", color=style.start_color)
-            gradient.add_stop_color(offset="100%", color=style.end_color)
+            gradient.add_stop_color(offset="0%", color=str(style.start_color))
+            gradient.add_stop_color(offset="100%", color=str(style.end_color))
             context.dwg.defs.add(gradient)
             fill_override = "url(#depth_gradient)"
 
@@ -191,12 +194,19 @@ class NetworkRenderer:
                 )
                 for poly in polygons:
                     fill_color = (
-                        fill_override if fill_override else (all_colors[0] if len(all_colors) > 0 else "black")
+                        fill_override
+                        if fill_override
+                        else (all_colors[0] if len(all_colors) > 0 else "black")
                     )
+                    if context.lighting:
+                        # For unioned polygons, we use a global directional fill
+                        fill_color = context.lighting.get_fill(
+                            fill_color, {"type": "global"}
+                        )
                     context.add(
                         context.dwg.polygon(
                             points=[(float(x), float(y)) for x, y in poly.coords],
-                            fill=fill_color,
+                            fill=str(fill_color),
                             **svg_attrs,
                         )
                     )
@@ -221,6 +231,11 @@ class NetworkRenderer:
                             p2 = start - n * (t_start / 2)
                             p3 = end - n * (t_end / 2)
                             p4 = end + n * (t_end / 2)
+                            fill = node_color
+                            if context.lighting:
+                                fill = context.lighting.get_fill(
+                                    node_color, {"type": "branch", "vector": v}
+                                )
                             context.add(
                                 context.dwg.polygon(
                                     points=[
@@ -229,7 +244,7 @@ class NetworkRenderer:
                                         (float(p3[0]), float(p3[1])),
                                         (float(p4[0]), float(p4[1])),
                                     ],
-                                    fill=node_color,
+                                    fill=str(fill),
                                     **svg_attrs,
                                 )
                             )
@@ -237,7 +252,7 @@ class NetworkRenderer:
                                 context.dwg.circle(
                                     center=(float(start[0]), float(start[1])),
                                     r=float(t_start / 2),
-                                    fill=node_color,
+                                    fill=str(fill),
                                     **svg_attrs,
                                 )
                             )
@@ -245,7 +260,7 @@ class NetworkRenderer:
                                 context.dwg.circle(
                                     center=(float(end[0]), float(end[1])),
                                     r=float(t_end / 2),
-                                    fill=node_color,
+                                    fill=str(fill),
                                     **svg_attrs,
                                 )
                             )
@@ -254,7 +269,7 @@ class NetworkRenderer:
                             context.dwg.line(
                                 start=(float(start[0]), float(start[1])),
                                 end=(float(end[0]), float(end[1])),
-                                stroke=node_color,
+                                stroke=str(node_color),
                                 stroke_width=all_thickness[i],
                                 stroke_linecap=style.stroke_linecap,
                                 stroke_linejoin=style.stroke_linejoin,
@@ -276,7 +291,9 @@ class NetworkRenderer:
                         if parent_idx is not None:
                             v = self.network.positions[idx] - self.network.positions[parent_idx]
                             angle = np.degrees(np.arctan2(v[1], v[0]))
-                    scale_factor = all_thickness[idx] / style.max_thickness if style.max_thickness > 0 else 1.0
+                    scale_factor = (
+                        all_thickness[idx] / style.max_thickness if style.max_thickness > 0 else 1.0
+                    )
                     # Ensure scale factor doesn't make organs too small to see
                     scale_factor = max(scale_factor, 0.5)
                     # Use branch color only if override is requested, otherwise let organ use its base_color
@@ -292,7 +309,10 @@ class NetworkRenderer:
                         # Draw a bright red circle at the attachment point
                         context.add(
                             context.dwg.circle(
-                                center=(float(self.network.positions[idx][0]), float(self.network.positions[idx][1])),
+                                center=(
+                                    float(self.network.positions[idx][0]),
+                                    float(self.network.positions[idx][1]),
+                                ),
                                 r=2.0,
                                 fill="red",
                                 fill_opacity=0.5,

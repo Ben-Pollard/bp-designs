@@ -16,11 +16,6 @@ At the start of each session or when resuming work:
 
 1. **Always read:** `docs/ROADMAP.md` to understand current phase, priorities, and recent decisions
 
-2. **Check for new exploration files:**
-   - List `docs/exploration/*.md` files
-   - Read any files from today's date
-   - Skim recent dated files if relevant to current work
-
 3. **Read selectively based on current work:**
    - Validating constraints → Consult `docs/design_goals.md` (constraints section)
    - Need external references → Check `docs/resources/RESOURCES.md`
@@ -40,7 +35,6 @@ Minimize token usage by reading only what's relevant. Maintain enough context to
 | File | When to Read | Contains |
 |------|-------------|----------|
 | `docs/design_goals.md` | Starting work, aesthetic decisions | Philosophy, aesthetic goals, physical constraints |
-| `docs/exploration/LEARNINGS.md` | Before experiments, when stuck | What works, what doesn't, proven patterns |
 | `docs/resources/algorithms.md` | Choosing approach | Quick algorithm overviews |
 | `docs/resources/RESOURCES.md` | Need citations/examples | External papers, examples, tools |
 | `docs/api.md` | Writing generator, pattern or geometry code | API philosophy |
@@ -48,12 +42,8 @@ Minimize token usage by reading only what's relevant. Maintain enough context to
 
 ### Documentation During Work
 
-**During exploration:**
-- Record detailed findings in `docs/exploration/[date]_[topic].md`
-- Include: parameters tested, visual observations, failed attempts, insights
 
 **After experiments:**
-- Distill key findings into `docs/exploration/LEARNINGS.md`
 - Update `docs/ROADMAP.md` with decisions and next steps
 - Archive dead ends (they're valuable context)
 
@@ -129,13 +119,6 @@ poetry run python -c "..." # Quick test imports/code
 2. Define parameter space using `ParameterSpace`
 3. Run with `ExperimentRunner` → outputs to `output/experiments/[name]/`
 4. Runner automatically updates `output/experiments/index.json`
-
-**Viewing Results:**
-1. Open `gallery/index.html` in browser (or via `python -m http.server 8000`)
-2. Click refresh if needed (gallery auto-discovers experiments from index.json)
-3. Select experiment from dropdown
-4. Compare variants visually
-5. Document findings in `docs/exploration/[date]_[topic].md`
 
 **Example:**
 ```bash

@@ -9,6 +9,8 @@ from pydantic import BaseModel, ConfigDict
 if TYPE_CHECKING:
     import svgwrite
 
+    from bp_designs.core.lighting import LightingModel
+
 
 class RenderStyle(BaseModel):
     """Base class for structured rendering parameters using Pydantic."""
@@ -33,9 +35,13 @@ class RenderStyle(BaseModel):
 class RenderingContext:
     """Wraps a drawing backend to provide structured rendering (groups, etc.)."""
 
-    def __init__(self, dwg: svgwrite.Drawing):
+    def __init__(self, dwg: svgwrite.Drawing, lighting: LightingModel | None = None):
         self.dwg = dwg
+        self.lighting = lighting
         self.stack = [dwg]
+
+        if self.lighting:
+            self.lighting.setup(self)
 
     def push_group(self, name: str, **kwargs) -> Any:
         """Create and enter a new SVG group."""

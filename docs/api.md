@@ -121,9 +121,14 @@ class SpaceColonization(Generator):
 ```python
 space = ParameterSpace(
     name="organic_exploration",
-    pattern={"organ_color": [Color.from_hex("#2d5a27")]},
+    specs={
+        "network.organ_color": [Color.from_hex("#2d5a27")],
+        "render.bg_saturation": [0.1, 0.2]
+    },
     derived={
-        "background_color": lambda p: p["organ_color"].complementary().to_hex()
+        "render.background_color": lambda p: p["network.organ_color"]
+            .complementary()
+            .with_hsl(s=p["render.bg_saturation"])
     }
 )
 ```

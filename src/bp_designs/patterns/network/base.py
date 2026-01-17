@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from bp_designs.patterns.organs import OrganPattern
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BranchNetwork(Pattern):
     """Semantic structure for branching patterns.
 
