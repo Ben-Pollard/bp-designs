@@ -1,7 +1,7 @@
 # Development Roadmap
 
 
-### Phase 1: Generator detail and composition interface ###
+### Phase 1a: Generator detail and composition interface ###
 - [x] simple 2-d pattern generators: oval, regular polygon.
 - [x] Integrate updated geometry api to get space colonisation working again
 - [x] While implementing growth: accept initial and maximum bounds as polygons in place of width/height. Restrict attractor generation to intital bounds
@@ -9,35 +9,46 @@
 - [ ] Growth: vein size implementation, following original paper
 - [x] pattern implements to_svg
 - [x] line thickness / tapering
-- [ ] Organic rendering:
+- [x] Organic rendering:
   - [x] Network refinement (decimation, relocation, subdivision)
-  - [ ] Outline-based skinning (polygons instead of lines)
-- [ ] organs / render styles
-- [ ] colour
+  - [x] Outline-based skinning (polygons instead of lines)
+- [x] organs / render styles
+- [x] colour
+- [ ] Multiple Starting points
+- [x] Shading
+  - [x] Pragmatic 2D SVG gradients implemented
+  - [ ] Future: Move to 3D for advanced lighting
+- [x] Generated organs
+  - [x] Refactored to OrganPattern/OrganGenerator architecture
+- [x] Background
+  - [x] Support for background_color in Canvas and to_svg
+  - [x] Coupled background colors via ParameterSpace
+  - [x] Refactor `BranchNetwork` into a modular package (`bp_designs.patterns.network`)
 
-###
+### Phase 1b: Trees Experimentation
+- [ ] Generate ideas
+- [ ] Non-tree applications
+  - [ ] Rivers (noise the growth vector)
+  - [ ] Cracking
+  - [ ] Leaf veins
+- [ ] Experiment with size
+- [x] Generate systematic variations:
+- [ ] Guided growth (different influence strengths)
+- [x] Use Gallery tool to batch render variations
+
+### Phase 1c: Tree output
+- [ ] For 2d colour printing: an array of trees
+
+
+
+### Phase 2: Bring Voronoi up to standard
 - [ ] Redo Voronoi following code style and architecture practices learned from space col
 
-### Phase 2 Completion: Exploration & Documentation
-- [ ] Generate systematic variations:
-  - Guided growth (different influence strengths)
-  - Textured patterns (different thresholds)
-  - Parameter sweeps
-- [ ] Use Gallery tool to batch render variations
-- [ ] Identify 5-10 "natural-looking" compositions
-- [ ] Document findings in `exploration/2025-01-30_tree_voronoi_composition.md`
+### Phase 3: Composition Experimentation & Further development
 - [ ] Update `LEARNINGS.md` with composition principles
+- [ ] Layering on canvas
+- [ ] 3d
 
----
-
-
-## Future Phases
-
-### Phase 3: Pattern Refinement
-- Add natural constraints (tapering, collision, boundaries)
-- Find parameter "sweet spots" through systematic exploration
-- Build preset library of proven configurations
-- Validate against leather manufacturing constraints
 
 ### Phase 4: Additional Pattern Families
 - Flow fields (directional texture)

@@ -6,10 +6,10 @@ Wraps polygons and other basic shapes as patterns.
 from __future__ import annotations
 
 import numpy as np
-import svgwrite
 
 from bp_designs.core.geometry import Canvas, Point, Polygon, Polyline
 from bp_designs.core.pattern import Pattern
+from bp_designs.core.renderer import RenderingContext, RenderStyle
 
 
 class PointPattern(Pattern):
@@ -35,14 +35,24 @@ class PointPattern(Pattern):
             return Point(x=abs_x, y=abs_y, z=None)
         return Point(x=self.x, y=self.y, z=None)
 
-    def to_svg(self, **kwargs) -> str:
+    def render(self, context: RenderingContext, style: RenderStyle | None = None, **kwargs):
         """Points don't have a standard SVG representation in our system yet."""
-        return ""
+        pass
 
     def __str__(self) -> str:
         if self._name:
             return self._name
         return f"Point({'rel' if self.is_relative else 'abs'}:{self.x},{self.y})"
+
+
+class ShapeStyle(RenderStyle):
+    """Structured rendering parameters for shapes."""
+
+    stroke_width: float = 0.5
+    stroke_color: str = "#000000"
+    fill: str | None = None
+    stroke_linecap: str = "round"
+    stroke_linejoin: str = "round"
 
 
 class ShapePattern(Pattern):
@@ -116,79 +126,40 @@ class ShapePattern(Pattern):
 
         return Polyline(polylines=[coords])
 
-    def to_svg(
+    def render(
         self,
-        stroke_width: float = 0.5,
-        stroke_color: str = "#000000",
-        fill: str | None = None,
-        stroke_linecap: str = "round",
-        stroke_linejoin: str = "round",
-        width: str | float = "100%",
-        height: str | float = "100%",
-        padding: float = 20,
-        background: str | None = None,
-    ) -> str:
-        """Render shape as SVG.
+        context: RenderingContext,
+        style: ShapeStyle | None = None,
+        **kwargs,
+    ):
+        """Render shape into the provided context."""
+        # Merge style and kwargs
+        if style is None:
+            style = ShapeStyle.from_dict(kwargs)
+        else:
+            style_dict = style.model_dump()
+            style_dict.update(kwargs)
+            style = ShapeStyle.from_dict(style_dict)
 
-        Args:
-            stroke_width: Line width in SVG units
-            stroke_color: Stroke color (any valid SVG color)
-            fill: Fill color (or None for no fill)
-            stroke_linecap: SVG linecap style ('round', 'butt', 'square')
-            stroke_linejoin: SVG linejoin style ('round', 'miter', 'bevel')
-            width: SVG canvas width (default '100%' for responsive)
-            height: SVG canvas height (default '100%' for responsive)
-            padding: Padding around shape in SVG units
-            background: Background color (or None for transparent)
-
-        Returns:
-            SVG string
-        """
         # Get polygon coordinates, ensure closed
         coords = self.polygon.coords
         if len(coords) > 0 and not np.allclose(coords[0], coords[-1]):
             coords = np.vstack([coords, coords[0:1]])
 
-        # Compute bounds with padding
-        xmin, ymin, xmax, ymax = self.polygon.bounds()
-        xmin -= padding
-        ymin -= padding
-        xmax += padding
-        ymax += padding
-        view_width = xmax - xmin
-        view_height = ymax - ymin
-
-        # Format size for svgwrite
-        def format_size(s):
-            if isinstance(s, str):
-                return s
-            return f"{s}px"
-
-        # Create SVG drawing
-        dwg = svgwrite.Drawing(
-            size=(format_size(width), format_size(height)),
-            viewBox=f"{xmin} {ymin} {view_width} {view_height}",
-        )
-
-        # Add background if specified
-        if background is not None:
-            dwg.add(dwg.rect(
-                insert=(xmin, ymin),
-                size=(view_width, view_height),
-                fill=background,
-            ))
-
         # Convert coordinates to list of tuples
         points = [(float(x), float(y)) for x, y in coords]
 
-        # Draw polygon
-        dwg.add(dwg.polygon(
-            points=points,
-            stroke=stroke_color,
-            stroke_width=stroke_width,
-            fill=fill if fill is not None else "none",
-            stroke_linecap=stroke_linecap,
-            stroke_linejoin=stroke_linejoin,
-        ))
+        svg_attrs = style.get_svg_attributes()
 
-        return dwg.tostring()
+        # Draw polygon
+        context.add(
+            context.dwg.polygon(
+                points=points,
+                stroke=style.stroke_color,
+                stroke_width=style.stroke_width,
+                fill=style.fill if style.fill is not None else "none",
+                stroke_linecap=style.stroke_linecap,
+                stroke_linejoin=style.stroke_linejoin,
+                **svg_attrs,
+            )
+        )

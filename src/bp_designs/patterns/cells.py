@@ -9,6 +9,17 @@ from scipy.spatial import KDTree, Voronoi
 
 from bp_designs.core.geometry import Polyline
 from bp_designs.core.pattern import Pattern
+from bp_designs.core.renderer import RenderingContext, RenderStyle
+
+
+class CellsStyle(RenderStyle):
+    """Structured rendering parameters for Voronoi cells."""
+
+    stroke_width: float = 0.5
+    stroke_color: str = "#000000"
+    fill: str | None = None
+    stroke_linecap: str = "round"
+    stroke_linejoin: str = "round"
 
 
 @dataclass
@@ -133,67 +144,25 @@ class Cells(Pattern):
 
         return Polyline(polylines=polylines)
 
-    def to_svg(
+    def render(
         self,
-        stroke_width: float = 0.5,
-        stroke_color: str = "#000000",
-        fill: str | None = None,
-        stroke_linecap: str = "round",
-        stroke_linejoin: str = "round",
-        width: str | float = "100%",
-        height: str | float = "100%",
-        padding: float = 20,
-        background: str | None = None,
-    ) -> str:
-        """Render Voronoi cells as SVG.
-
-        Args:
-            stroke_width: Line width in SVG units
-            stroke_color: Stroke color (any valid SVG color)
-            fill: Fill color (or None for no fill)
-            stroke_linecap: SVG linecap style ('round', 'butt', 'square')
-            stroke_linejoin: SVG linejoin style ('round', 'miter', 'bevel')
-            width: SVG canvas width (default '100%' for responsive)
-            height: SVG canvas height (default '100%' for responsive)
-            padding: Padding around shape in SVG units
-            background: Background color (or None for transparent)
-
-        Returns:
-            SVG string
-        """
-        import svgwrite
+        context: RenderingContext,
+        style: CellsStyle | None = None,
+        **kwargs,
+    ):
+        """Render Voronoi cells into the provided context."""
+        # Merge style and kwargs
+        if style is None:
+            style = CellsStyle.from_dict(kwargs)
+        else:
+            style_dict = style.model_dump()
+            style_dict.update(kwargs)
+            style = CellsStyle.from_dict(style_dict)
 
         # Get geometry polylines
         geometry = self.to_geometry()
 
-        # Compute bounds with padding
-        xmin, ymin, xmax, ymax = self.bounds()
-        xmin -= padding
-        ymin -= padding
-        xmax += padding
-        ymax += padding
-        view_width = xmax - xmin
-        view_height = ymax - ymin
-
-        # Format size for svgwrite
-        def format_size(s):
-            if isinstance(s, str):
-                return s
-            return f"{s}px"
-
-        # Create SVG drawing
-        dwg = svgwrite.Drawing(
-            size=(format_size(width), format_size(height)),
-            viewBox=f"{xmin} {ymin} {view_width} {view_height}",
-        )
-
-        # Add background if specified
-        if background is not None:
-            dwg.add(dwg.rect(
-                insert=(xmin, ymin),
-                size=(view_width, view_height),
-                fill=background,
-            ))
+        svg_attrs = style.get_svg_attributes()
 
         # Draw each polyline
         for polyline in geometry.polylines:
@@ -205,28 +174,28 @@ class Cells(Pattern):
 
             if len(polyline) == 2:
                 # Edge - draw as line
-                line = dwg.line(
+                line = context.dwg.line(
                     start=points[0],
                     end=points[1],
-                    stroke=stroke_color,
-                    stroke_width=stroke_width,
-                    stroke_linecap=stroke_linecap,
+                    stroke=style.stroke_color,
+                    stroke_width=style.stroke_width,
+                    stroke_linecap=style.stroke_linecap,
                     fill="none",
+                    **svg_attrs,
                 )
-                dwg.add(line)
+                context.add(line)
             else:
                 # Cell polygon - draw as polygon
-                poly = dwg.polygon(
+                poly = context.dwg.polygon(
                     points=points,
-                    stroke=stroke_color,
-                    stroke_width=stroke_width,
-                    stroke_linecap=stroke_linecap,
-                    stroke_linejoin=stroke_linejoin,
-                    fill=fill if fill is not None else "none",
+                    stroke=style.stroke_color,
+                    stroke_width=style.stroke_width,
+                    stroke_linecap=style.stroke_linecap,
+                    stroke_linejoin=style.stroke_linejoin,
+                    fill=style.fill if style.fill is not None else "none",
+                    **svg_attrs,
                 )
-                dwg.add(poly)
-
-        return dwg.tostring()
+                context.add(poly)
 
     def bounds(self) -> tuple[float, float, float, float]:
         """Return pattern bounds."""

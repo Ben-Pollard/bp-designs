@@ -14,6 +14,7 @@ scipy = "^1.16.3"
 svgwrite = "^1.4.3"
 einops = "^0.8.1"
 shapely = "^2.1.2"
+pydantic = "^2.12.5"
 
 
 [tool.poetry.group.dev.dependencies]

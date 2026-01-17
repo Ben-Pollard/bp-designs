@@ -179,28 +179,14 @@ class ExperimentRunner:
             print(f"[{i + 1}/{num_variants}] Generating {variant_id}...", end=" ")
 
             try:
-                # Separate pattern and render parameters
-                pattern_params = {}
-                render_params = {}
-                for key, value in params.items():
-                    if key in grid.pattern_param_names:
-                        pattern_params[key] = value
-                    elif key in grid.render_param_names:
-                        render_params[key] = value
-                    else:
-                        # Should not happen, but keep as pattern param for safety
-                        pattern_params[key] = value
+                # Generate pattern. The generator_fn is now responsible for
+                # using the parameters correctly (e.g. passing them to the generator).
+                result = generator_fn(params)
 
-                # Generate pattern with pattern parameters only
-                result = generator_fn(pattern_params)
-
-                # Determine SVG size (use render params if provided, otherwise runner defaults)
-                svg_width = render_params.get('width', self.svg_width)
-                svg_height = render_params.get('height', self.svg_height)
-
-                # Save SVG with render parameters
+                # Save SVG. The pattern now knows how to render itself using its
+                # internal canvas and render_params.
                 svg_path = self.outputs_dir / f"{variant_id}.svg"
-                svg_string = result.to_svg(**render_params)
+                svg_string = result.to_svg()
                 svg_path.write_text(svg_string)
 
                 # Save metadata
@@ -208,8 +194,6 @@ class ExperimentRunner:
                     "variant_id": variant_id,
                     "params": self._serialize_value(params),
                     "svg_path": f"outputs/{variant_id}.svg",
-                    "svg_size": {"width": svg_width, "height": svg_height},
-                    "stroke_width": render_params.get('stroke_width', self.stroke_width) or "default",
                 }
 
                 metadata_path = self.outputs_dir / f"{variant_id}.json"
@@ -254,11 +238,6 @@ class ExperimentRunner:
             "failures": failures,
             "elapsed_seconds": elapsed,
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "svg_config": {
-                "width": self.svg_width,
-                "height": self.svg_height,
-                "stroke_width": self.stroke_width,
-            },
         }
 
         config_path = self.exp_dir / "config.json"

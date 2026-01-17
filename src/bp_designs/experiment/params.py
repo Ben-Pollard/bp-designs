@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from itertools import product
 from typing import Any
 
@@ -29,6 +30,7 @@ class ParameterSpace:
     name: str
     pattern: dict[str, Any]
     render: dict[str, Any]
+    derived: dict[str, Callable[[dict[str, Any]], Any]] = field(default_factory=dict)
 
     def __post_init__(self):
         """Validate parameter specifications."""
@@ -90,12 +92,23 @@ class ParameterSpace:
         for pattern_combo in pattern_combinations:
             for render_combo in render_combinations:
                 combo = {**pattern_combo, **render_combo}
+
+                # Apply derived parameters
+                for derived_name, fn in self.derived.items():
+                    try:
+                        combo[derived_name] = fn(combo)
+                    except Exception as e:
+                        # If a derived parameter fails, we might want to know why
+                        # but for now we'll just set it to None or skip
+                        combo[derived_name] = f"Error: {e}"
+
                 combinations.append(combo)
 
         return ParameterGrid(
             space_name=self.name,
             pattern_param_names=pattern_names,
             render_param_names=render_names,
+            derived_param_names=list(self.derived.keys()),
             combinations=combinations,
         )
 
@@ -111,6 +124,7 @@ class ParameterGrid:
     pattern_param_names: list[str]
     render_param_names: list[str]
     combinations: list[dict[str, Any]]
+    derived_param_names: list[str] = field(default_factory=list)
 
     def __len__(self) -> int:
         """Number of parameter combinations."""
@@ -136,7 +150,7 @@ class ParameterGrid:
         ]
 
         # Combine all parameter names
-        all_param_names = self.pattern_param_names + self.render_param_names
+        all_param_names = self.pattern_param_names + self.render_param_names + self.derived_param_names
 
         # Separate variable and fixed parameters
         variable_params = []
@@ -174,10 +188,14 @@ class ParameterGrid:
                 lines.append(f"  {param}: {value}")
 
         # Add section headers for pattern vs render if needed
-        if self.pattern_param_names and self.render_param_names:
+        if self.pattern_param_names or self.render_param_names or self.derived_param_names:
             lines.append("")
             lines.append("Parameter categories:")
-            lines.append(f"  Pattern parameters: {len(self.pattern_param_names)}")
-            lines.append(f"  Render parameters: {len(self.render_param_names)}")
+            if self.pattern_param_names:
+                lines.append(f"  Pattern parameters: {len(self.pattern_param_names)}")
+            if self.render_param_names:
+                lines.append(f"  Render parameters: {len(self.render_param_names)}")
+            if self.derived_param_names:
+                lines.append(f"  Derived parameters: {len(self.derived_param_names)}")
 
         return "\n".join(lines)

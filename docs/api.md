@@ -117,6 +117,17 @@ class SpaceColonization(Generator):
 
 ## Data Flow Examples
 
+### Coupled Parameters (Experimentation)
+```python
+space = ParameterSpace(
+    name="organic_exploration",
+    pattern={"organ_color": [Color.from_hex("#2d5a27")]},
+    derived={
+        "background_color": lambda p: p["organ_color"].complementary().to_hex()
+    }
+)
+```
+
 ### Simple Generation
 ```python
 bounds = Polygon.rectangle(0, 0, 100, 100)

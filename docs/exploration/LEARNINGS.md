@@ -79,5 +79,9 @@
 - Keep experiment module separate from pattern generation for clean separation of concerns
 - Use `poetry run python` to ensure correct Python version (>=3.12,<3.13)
 - **Network Refinement**: Raw algorithmic output (like Space Colonization) is often too jagged for physical fabrication. A three-step refinement process (Decimate → Subdivide → Relocate) significantly improves organic quality and manufacturability.
+- **Organic Rendering (Outline-based Skinning)**: Moving from stroke-based rendering to a single unioned polygon "skin" (using Shapely) produces much cleaner vector paths for manufacturing. It handles complex branching points naturally and supports smooth tapering without overlapping artifacts.
+- **Parameter Coupling**: When coupling parameters in experiments (e.g., background color to organ color), ensure the parameters are correctly categorized as pattern or render. Derived parameters may need to be present in both sets if they affect both generation (e.g., via Canvas) and rendering (e.g., via SVG background).
+- **Generator Robustness**: Generators should accept `**kwargs` in their `__init__` to gracefully handle extra parameters passed from experiment grids, maintaining a clean interface in experiment scripts.
+- **Distribution Strategies**: Organ distribution is a property of the network structure, not the organs themselves. Distribution strategies should be implemented where they can access the network's semantic information (like leaf nodes or branch hierarchy).
 
 ---

@@ -13,11 +13,13 @@ All generative patterns implement this interface, enabling:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .geometry import Canvas, Geometry
+    from .renderer import RenderingContext, RenderStyle
+    from .scene import Layer
 
 
 @dataclass
@@ -33,6 +35,9 @@ class Pattern(ABC):
     The Pattern interface is how they expose themselves to the outside world.
     """
 
+    # Default rendering parameters for this pattern instance
+    render_params: dict[str, Any] = field(default_factory=dict)
+
     @abstractmethod
     def to_geometry(self, canvas: Canvas | None = None) -> Geometry:
         """Convert pattern to renderable geometry.
@@ -44,8 +49,67 @@ class Pattern(ABC):
         pass
 
     @abstractmethod
-    def to_svg(self) -> str:
+    def render(self, context: RenderingContext, style: RenderStyle | None = None, **kwargs):
+        """Render pattern into the provided context.
+
+        Args:
+            context: Rendering context (e.g. SVG drawing wrapper)
+            style: Structured rendering parameters.
+            **kwargs: Additional rendering parameters (overrides style).
+        """
         pass
+
+    def to_layers(self) -> list[Layer]:
+        """Decompose pattern into multiple layers for rendering.
+
+        Default implementation returns the pattern itself as a single layer.
+        """
+        from .scene import Layer
+
+        return [Layer(name=getattr(self, "name", "pattern"), pattern=self)]
+
+    def to_svg(self, **kwargs) -> str:
+        """Definitive entry point for rendering a pattern to a standalone SVG string.
+
+        This method uses the Scene and RenderingContext system to ensure a
+        consistent rendering flow.
+
+        Args:
+            **kwargs: Overrides for render_params and Scene settings.
+        """
+        from .geometry import Canvas
+        from .scene import Scene
+
+        # Merge instance render_params with overrides
+        params = {**self.render_params, **kwargs}
+
+        # Try to get canvas from self if it exists, otherwise use default
+        canvas = getattr(self, "canvas", None)
+        if canvas is None:
+            # Try to compute bounds to create a fitting canvas
+            try:
+                xmin, ymin, xmax, ymax = self.bounds()
+                # Add some padding
+                w, h = xmax - xmin, ymax - ymin
+                canvas = Canvas.from_width_height(int(w + 40), int(h + 40))
+            except (AttributeError, ValueError):
+                canvas = Canvas.from_size(100)
+
+        # Scene-level parameters should be handled here and not passed to layers
+        bg_color = params.pop("background_color", None)
+        if bg_color:
+            canvas.background_color = bg_color
+
+        scene = Scene(canvas)
+
+        # Use to_layers to decompose the pattern if supported
+        layers = self.to_layers()
+        for layer in layers:
+            # Merge layer-specific params with global overrides
+            layer_params = {**layer.params, **params}
+            scene.add_layer(layer.name, layer.pattern, **layer_params)
+
+        return scene.to_svg(**params)
 
     @abstractmethod
     def __str__(self) -> str:

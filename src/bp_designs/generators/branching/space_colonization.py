@@ -1,5 +1,9 @@
 """Space Colonization algorithm - vectorized implementation with semantic preservation."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
 import numpy as np
 from shapely.geometry import Polygon as ShapelyPolygon
 
@@ -8,6 +12,9 @@ from bp_designs.core.generator import Generator
 from bp_designs.core.geometry import Canvas, Point, Polygon
 from bp_designs.core.pattern import Pattern
 from bp_designs.patterns.network import BranchNetwork
+
+if TYPE_CHECKING:
+    from bp_designs.patterns.organs import OrganPattern
 
 
 class SpaceColonization(Generator):
@@ -31,6 +38,8 @@ class SpaceColonization(Generator):
         segment_length: float = 2.0,
         boundary_expansion: float = 10.0,
         max_iterations: int = 1000,
+        organ_template: OrganPattern | None = None,
+        organ_distribution: str | Any = "terminal",
     ):
         """Initialize Space Colonization generator.
 
@@ -69,23 +78,25 @@ class SpaceColonization(Generator):
 
         # Resolve boundaries to polygons
         initial_geom = initial_boundary.to_geometry(canvas)
-        if hasattr(initial_geom, 'polylines'): # Polyline
-             self.initial_boundary = Polygon(coords=initial_geom.polylines[0])
+        if hasattr(initial_geom, "polylines"):  # Polyline
+            self.initial_boundary = Polygon(coords=initial_geom.polylines[0])
         else:
-             raise ValueError(f"initial_boundary must resolve to Polyline/Polygon, got {type(initial_geom)}")
+            raise ValueError(f"initial_boundary must resolve to Polyline/Polygon, got {type(initial_geom)}")
 
         final_geom = final_boundary.to_geometry(canvas)
-        if hasattr(final_geom, 'polylines'): # Polyline
-             self.final_boundary = Polygon(coords=final_geom.polylines[0])
+        if hasattr(final_geom, "polylines"):  # Polyline
+            self.final_boundary = Polygon(coords=final_geom.polylines[0])
         else:
-             raise ValueError(f"final_boundary must resolve to Polyline/Polygon, got {type(final_geom)}")
+            raise ValueError(f"final_boundary must resolve to Polyline/Polygon, got {type(final_geom)}")
         self.max_iterations = max_iterations
+        self.organ_template = organ_template
+        self.organ_distribution = organ_distribution
 
-    def generate_pattern(self, **kwargs) -> BranchNetwork:
+    def generate_pattern(self, **render_params) -> BranchNetwork:
         """Generate branching pattern using stored parameters.
 
         Args:
-            **kwargs: For compatibility with Generator interface (ignored)
+            **render_params: Rendering parameters to store in the resulting Pattern.
 
         Returns:
             BranchNetwork representing the generated branching pattern
@@ -108,6 +119,14 @@ class SpaceColonization(Generator):
 
         # Ensure pattern_bounds is set on the final network
         network.pattern_bounds = self.canvas.bounds()
+
+        # Attach organs to the final network if template provided
+        if self.organ_template is not None:
+            network.organ_template = self.organ_template
+            network.organ_distribution = self.organ_distribution
+            network.attach_organs(self.organ_template, self.organ_distribution)
+
+        network.render_params = render_params
         return network
 
     def _initialize_network(self, timestamp: int) -> BranchNetwork:
@@ -167,6 +186,7 @@ class SpaceColonization(Generator):
 
             # Vectorized containment check using shapely.contains
             import shapely
+
             candidate_points = shapely.points(candidates)
             mask = shapely.contains(shapely_poly, candidate_points)
             valid_points = candidates[mask]
@@ -188,6 +208,7 @@ class SpaceColonization(Generator):
         """
         # Compute convex hull of all nodes
         import shapely
+
         points = shapely.points(network.positions)
         hull = shapely.convex_hull(shapely.multipoints(points))
 
@@ -204,7 +225,7 @@ class SpaceColonization(Generator):
             return self.final_boundary
 
         # Handle MultiPolygon by taking convex hull
-        if clipped.geom_type == 'MultiPolygon':
+        if clipped.geom_type == "MultiPolygon":
             clipped = clipped.convex_hull
             # After convex hull, may still be Point/LineString if degenerate
             if clipped.is_empty:
@@ -239,6 +260,7 @@ class SpaceColonization(Generator):
         # This avoids the O(N*M) distance matrix.
         try:
             from scipy.spatial import cKDTree
+
             node_tree = cKDTree(network.positions)
 
             # For each attraction point, find the closest node
@@ -259,7 +281,9 @@ class SpaceColonization(Generator):
             vectors = attractions - network.positions[closest_node_indices]
             return closest_node_indices, dists, vectors
 
-    def _growth_vectors(self, closest_node_indices: np.ndarray, dists: np.ndarray, vectors: np.ndarray, num_nodes: int) -> DirectionVectors:
+    def _growth_vectors(
+        self, closest_node_indices: np.ndarray, dists: np.ndarray, vectors: np.ndarray, num_nodes: int
+    ) -> DirectionVectors:
         """Compute growth vectors from attraction data.
 
         Args:
@@ -280,7 +304,7 @@ class SpaceColonization(Generator):
         node_directions = np.zeros((num_nodes, 2))
 
         # Compute directions for attraction points
-        with np.errstate(divide='ignore', invalid='ignore'):
+        with np.errstate(divide="ignore", invalid="ignore"):
             mask = dists > 0
             directions = np.zeros_like(vectors)
             directions[mask] = vectors[mask] / dists[mask, None]
@@ -291,7 +315,7 @@ class SpaceColonization(Generator):
         # Normalize node directions
         norms = np.sqrt(np.sum(node_directions**2, axis=1))[:, None]
 
-        with np.errstate(divide='ignore', invalid='ignore'):
+        with np.errstate(divide="ignore", invalid="ignore"):
             normalised_node_directions = np.where(norms > 0, node_directions / norms, 0.0)
 
         growth_vectors = normalised_node_directions * self.segment_length
@@ -317,6 +341,7 @@ class SpaceColonization(Generator):
         if attractions.size > 0:
             try:
                 from scipy.spatial import cKDTree
+
                 tree = cKDTree(attractions)
                 dist, _ = tree.query(new_attractions, k=1)
                 new_attr_selection = dist > self.kill_distance
@@ -332,6 +357,7 @@ class SpaceColonization(Generator):
         # Remove colonized attractions (those within kill distance of nodes)
         try:
             from scipy.spatial import cKDTree
+
             node_tree = cKDTree(network.positions)
             dist, _ = node_tree.query(attractions, k=1)
             kill_mask = dist > self.kill_distance
@@ -375,4 +401,3 @@ class SpaceColonization(Generator):
         )
 
         return updated_network, attractions
-

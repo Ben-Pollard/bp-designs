@@ -63,6 +63,7 @@ class Polygon(Geometry):
 
 @dataclass
 class Canvas(Polygon):
+    background_color: str | None = None
 
     def __str__(self) -> str:
         """Return concise string representation."""
