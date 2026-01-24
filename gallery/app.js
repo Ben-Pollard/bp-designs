@@ -23,6 +23,8 @@ let experimentDate;
 let experimentDescription;
 let variantsSection;
 let variantsGrid;
+let fixedParamsSection;
+let fixedParamsGrid;
 let emptyState;
 let errorState;
 let errorMessage;
@@ -44,6 +46,8 @@ async function init() {
     experimentDescription = document.getElementById('experiment-description');
     variantsSection = document.getElementById('variants-section');
     variantsGrid = document.getElementById('variants-grid');
+    fixedParamsSection = document.getElementById('fixed-params-section');
+    fixedParamsGrid = document.getElementById('fixed-params-grid');
     emptyState = document.getElementById('empty-state');
     errorState = document.getElementById('error-state');
     errorMessage = document.getElementById('error-message');
@@ -202,14 +206,51 @@ function renderExperiment(experiment) {
         experimentDescription.style.display = 'none';
     }
 
+    // Render fixed parameters
+    renderFixedParameters(config.parameters);
+
     // Render variants
-    renderVariants(variants);
+    const variedParamNames = config.parameters && config.parameters.varied
+        ? Object.keys(config.parameters.varied)
+        : [];
+    renderVariants(variants, variedParamNames);
+}
+
+/**
+ * Render fixed parameters
+ */
+function renderFixedParameters(parameters) {
+    fixedParamsGrid.innerHTML = '';
+
+    if (!parameters || !parameters.fixed || Object.keys(parameters.fixed).length === 0) {
+        fixedParamsSection.classList.add('hidden');
+        return;
+    }
+
+    fixedParamsSection.classList.remove('hidden');
+
+    Object.entries(parameters.fixed).forEach(([key, value]) => {
+        const paramDiv = document.createElement('div');
+        paramDiv.className = 'fixed-param';
+
+        const paramName = document.createElement('span');
+        paramName.className = 'param-name';
+        paramName.textContent = key;
+
+        const paramValue = document.createElement('span');
+        paramValue.className = 'param-value';
+        paramValue.textContent = formatValue(value);
+
+        paramDiv.appendChild(paramName);
+        paramDiv.appendChild(paramValue);
+        fixedParamsGrid.appendChild(paramDiv);
+    });
 }
 
 /**
  * Render variant grid
  */
-function renderVariants(variants) {
+function renderVariants(variants, variedParamNames) {
     variantsGrid.innerHTML = '';
 
     if (variants.length === 0) {
@@ -220,7 +261,7 @@ function renderVariants(variants) {
     variantsSection.classList.remove('hidden');
 
     variants.forEach(variant => {
-        const card = createVariantCard(variant);
+        const card = createVariantCard(variant, variedParamNames);
         variantsGrid.appendChild(card);
     });
 }
@@ -228,7 +269,7 @@ function renderVariants(variants) {
 /**
  * Create variant card element
  */
-function createVariantCard(variant) {
+function createVariantCard(variant, variedParamNames) {
     const card = document.createElement('div');
     card.className = 'variant-card';
 
@@ -255,6 +296,11 @@ function createVariantCard(variant) {
 
     // Render parameters
     Object.entries(variant.params).forEach(([key, value]) => {
+        // Only show parameters that were varied in the experiment
+        if (variedParamNames.length > 0 && !variedParamNames.includes(key)) {
+            return;
+        }
+
         const paramDiv = document.createElement('div');
         paramDiv.className = 'variant-param';
 

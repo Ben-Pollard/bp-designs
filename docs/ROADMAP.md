@@ -26,7 +26,12 @@
   - [x] Coupled background colors via ParameterSpace
   - [x] Refactor `BranchNetwork` into a modular package (`bp_designs.patterns.network`)
 
-### Phase 1b: Trees Experimentation
+### Phase 1b: Tree Fixes
+- [ ] Use thickness strategy
+- [ ] Use refinement
+- [ ] Fix output exceeding canvas size 
+
+### Phase 1c: Trees Experimentation
 - [ ] Generate ideas
 - [ ] Non-tree applications
   - [ ] Rivers (noise the growth vector)
@@ -34,6 +39,7 @@
   - [ ] Leaf veins
 - [ ] Experiment with size
 - [x] Generate systematic variations:
+- [x] Parallelize experiment runner for faster batch generation
 - [ ] Guided growth (different influence strengths)
 - [x] Use Gallery tool to batch render variations
 

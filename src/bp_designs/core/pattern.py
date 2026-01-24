@@ -38,6 +38,9 @@ class Pattern(ABC):
     # Default rendering parameters for this pattern instance
     render_params: dict[str, Any] = field(default_factory=dict)
 
+    # Coordinate system reference
+    canvas: Canvas | None = None
+
     @abstractmethod
     def to_geometry(self, canvas: Canvas | None = None) -> Geometry:
         """Convert pattern to renderable geometry.
@@ -77,23 +80,18 @@ class Pattern(ABC):
         Args:
             **kwargs: Overrides for render_params and Scene settings.
         """
-        from .geometry import Canvas
         from .scene import Scene
 
         # Merge instance render_params with overrides
         params = {**self.render_params, **kwargs}
 
         # Try to get canvas from self if it exists, otherwise use default
-        canvas = getattr(self, "canvas", None)
+        canvas = kwargs.pop("canvas", getattr(self, "canvas", None))
         if canvas is None:
-            # Try to compute bounds to create a fitting canvas
-            try:
-                xmin, ymin, xmax, ymax = self.bounds()
-                # Add some padding
-                w, h = xmax - xmin, ymax - ymin
-                canvas = Canvas.from_width_height(int(w + 40), int(h + 40))
-            except (AttributeError, ValueError):
-                canvas = Canvas.from_size(100)
+            raise ValueError(
+                f"Pattern {self} has no canvas. A canvas must be supplied for rendering. "
+                "Pass it to to_svg(canvas=...) or ensure the pattern has a .canvas attribute."
+            )
 
         # Scene-level parameters should be handled here and not passed to layers
         bg_color = params.pop("background_color", None)

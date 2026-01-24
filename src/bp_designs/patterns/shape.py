@@ -18,7 +18,15 @@ class PointPattern(Pattern):
     Can be absolute or relative (0-1).
     """
 
-    def __init__(self, x: float, y: float, is_relative: bool = False, name: str | None = None):
+    def __init__(
+        self,
+        x: float,
+        y: float,
+        is_relative: bool = False,
+        name: str | None = None,
+        canvas: Canvas | None = None,
+    ):
+        super().__init__(canvas=canvas)
         self.x = x
         self.y = y
         self.is_relative = is_relative
@@ -26,6 +34,7 @@ class PointPattern(Pattern):
 
     def to_geometry(self, canvas: Canvas | None = None) -> Point:
         """Resolve to a Point geometry."""
+        canvas = canvas or self.canvas
         if self.is_relative and canvas is not None:
             bounds = canvas.bounds()
             width = bounds[2] - bounds[0]
@@ -67,6 +76,7 @@ class ShapePattern(Pattern):
         polygon: Polygon,
         name: str | None = None,
         is_relative: bool = False,
+        canvas: Canvas | None = None,
     ):
         """Initialize shape pattern.
 
@@ -74,10 +84,45 @@ class ShapePattern(Pattern):
             polygon: The polygon defining the shape
             name: Optional descriptive name for the shape.
             is_relative: If True, coordinates are treated as 0-1 and scaled to canvas.
+            canvas: Optional canvas reference.
         """
+        super().__init__(canvas=canvas)
         self.polygon = polygon
         self._name = name
         self.is_relative = is_relative
+
+    def make_relative(self, canvas: Canvas | None = None) -> ShapePattern:
+        """Convert absolute coordinates to relative 0-1 coordinates based on canvas.
+
+        Args:
+            canvas: Canvas to normalize against. If None, uses self.canvas.
+
+        Returns:
+            New ShapePattern with relative coordinates.
+        """
+        canvas = canvas or self.canvas
+        if canvas is None:
+            raise ValueError("Cannot make relative without a canvas.")
+
+        if self.is_relative:
+            return self
+
+        bounds = canvas.bounds()
+        width = bounds[2] - bounds[0]
+        height = bounds[3] - bounds[1]
+
+        new_coords = self.polygon.coords.copy()
+        if width > 0:
+            new_coords[:, 0] = (new_coords[:, 0] - bounds[0]) / width
+        if height > 0:
+            new_coords[:, 1] = (new_coords[:, 1] - bounds[1]) / height
+
+        return ShapePattern(
+            Polygon(coords=new_coords),
+            name=self._name,
+            is_relative=True,
+            canvas=canvas,
+        )
 
     def __str__(self) -> str:
         """Return human-readable string representation."""
@@ -112,6 +157,7 @@ class ShapePattern(Pattern):
 
         If is_relative is True and canvas is provided, scales coordinates.
         """
+        canvas = canvas or self.canvas
         coords = self.polygon.coords
 
         if self.is_relative and canvas is not None:

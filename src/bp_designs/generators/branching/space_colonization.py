@@ -12,8 +12,10 @@ from bp_designs.core.generator import Generator
 from bp_designs.core.geometry import Canvas, Point, Polygon
 from bp_designs.core.pattern import Pattern
 from bp_designs.patterns.network import BranchNetwork
+from bp_designs.patterns.network.refinement import NetworkRefinementStrategy
 
 if TYPE_CHECKING:
+    from bp_designs.patterns.network.refinement import NetworkRefinementStrategy
     from bp_designs.patterns.organs import OrganPattern
 
 
@@ -38,6 +40,7 @@ class SpaceColonization(Generator):
         segment_length: float = 2.0,
         boundary_expansion: float = 10.0,
         max_iterations: int = 1000,
+        refinement_strategy: NetworkRefinementStrategy = None,
         organ_template: OrganPattern | None = None,
         organ_distribution: str | Any = "terminal",
     ):
@@ -63,6 +66,7 @@ class SpaceColonization(Generator):
         self.boundary_expansion = boundary_expansion
         self.root_position_pattern = root_position
         self.canvas = canvas
+        self.refinement_strategy = refinement_strategy
         # Store boundary patterns
         self.initial_boundary_pattern = initial_boundary
         self.final_boundary_pattern = final_boundary
@@ -92,10 +96,13 @@ class SpaceColonization(Generator):
         self.organ_template = organ_template
         self.organ_distribution = organ_distribution
 
-    def generate_pattern(self, **render_params) -> BranchNetwork:
+    def generate_pattern(
+        self, **render_params
+    ) -> BranchNetwork:
         """Generate branching pattern using stored parameters.
 
         Args:
+            refinement_strategy: Optional strategy to refine the network before organ attachment.
             **render_params: Rendering parameters to store in the resulting Pattern.
 
         Returns:
@@ -117,14 +124,21 @@ class SpaceColonization(Generator):
                 break
             network_previous = network
 
-        # Ensure pattern_bounds is set on the final network
+        # Ensure canvas and pattern_bounds are set on the final network
+        network.canvas = self.canvas
         network.pattern_bounds = self.canvas.bounds()
+
+        # Apply refinement if strategy provided
+        if self.refinement_strategy is not None:
+            network = self.refinement_strategy.apply(network)
 
         # Attach organs to the final network if template provided
         if self.organ_template is not None:
             network.organ_template = self.organ_template
             network.organ_distribution = self.organ_distribution
-            network.attach_organs(self.organ_template, self.organ_distribution)
+            # Pass distribution_params if they exist in render_params
+            dist_params = render_params.get("distribution_params", {})
+            network.attach_organs(self.organ_template, self.organ_distribution, distribution_params=dist_params)
 
         network.render_params = render_params
         return network
@@ -143,6 +157,7 @@ class SpaceColonization(Generator):
             positions=self.root_position_array.reshape(1, 2),  # (N,2) - root position as array
             parents=np.array([-1], dtype=np.int16),  # (N,) - root has no parent
             timestamps=np.array([timestamp], dtype=np.int16),  # (N,) - root timestamp
+            canvas=self.canvas,
             pattern_bounds=self.canvas.bounds(),
         )
         return network
@@ -398,6 +413,8 @@ class SpaceColonization(Generator):
             positions=np.vstack([network.positions, new_positions]),
             parents=np.hstack([network.parents, growing_nodes.node_ids]),
             timestamps=np.hstack([network.timestamps, new_timestamps]),
+            canvas=network.canvas,
+            pattern_bounds=network.pattern_bounds,
         )
 
         return updated_network, attractions

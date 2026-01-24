@@ -40,6 +40,7 @@ class Oval(Primitive2D):
         bbox: tuple[float, float, float, float],
         canvas: Canvas | None = None,
         name: str | None = None,
+        is_relative: bool = False,
     ):
         """Initialize oval from bounding box.
 
@@ -49,10 +50,12 @@ class Oval(Primitive2D):
             canvas: Optional canvas to bound the oval within. If provided,
                 the oval will be scaled to fit within canvas (centered automatically).
             name: Optional descriptive name for the oval pattern.
+            is_relative: Whether the bbox is in relative 0-1 coordinates.
         """
         self.bbox = bbox
         self.canvas = canvas
         self.name = name
+        self.is_relative = is_relative
 
     @classmethod
     def from_bbox(
@@ -65,7 +68,8 @@ class Oval(Primitive2D):
 
         Primary constructor.
         """
-        return cls(bbox=tuple(bbox), canvas=canvas, name=name)
+        is_relative = all(0.0 <= v <= 1.0 for v in bbox)
+        return cls(bbox=tuple(bbox), canvas=canvas, name=name, is_relative=is_relative)
 
     @classmethod
     def from_width_height(
@@ -80,20 +84,24 @@ class Oval(Primitive2D):
         If canvas is provided, centers the oval on the canvas.
         Otherwise, centers at origin (0,0).
         """
+        is_relative = False
         if canvas is not None:
-            bounds = canvas.bounds()
-            cx = (bounds[0] + bounds[2]) / 2
-            cy = (bounds[1] + bounds[3]) / 2
-            x0 = cx - width / 2
-            y0 = cy - height / 2
-            x1 = cx + width / 2
-            y1 = cy + height / 2
+            if width <= 1.0 and height <= 1.0:
+                is_relative = True
+                cx, cy = 0.5, 0.5
+            else:
+                bounds = canvas.bounds()
+                cx = (bounds[0] + bounds[2]) / 2
+                cy = (bounds[1] + bounds[3]) / 2
         else:
-            x0 = -width / 2
-            y0 = -height / 2
-            x1 = width / 2
-            y1 = height / 2
-        return cls.from_bbox(bbox=(x0, y0, x1, y1), canvas=canvas, name=name)
+            cx, cy = 0.0, 0.0
+
+        x0 = cx - width / 2
+        y0 = cy - height / 2
+        x1 = cx + width / 2
+        y1 = cy + height / 2
+
+        return cls(bbox=(x0, y0, x1, y1), canvas=canvas, name=name, is_relative=is_relative)
 
     def generate_pattern(self, **kwargs) -> ShapePattern:
         """Generate oval as a polygon.
@@ -106,24 +114,6 @@ class Oval(Primitive2D):
         height = y1 - y0
         cx = (x0 + x1) / 2
         cy = (y0 + y1) / 2
-
-        is_relative = False
-        # If canvas is provided, we treat the bbox as relative to that canvas
-        # and return a relative ShapePattern
-        if self.canvas is not None:
-            canvas_bounds = self.canvas.bounds()
-            canvas_width = canvas_bounds[2] - canvas_bounds[0]
-            canvas_height = canvas_bounds[3] - canvas_bounds[1]
-
-            # Normalize coordinates to 0-1 relative to canvas
-            # This assumes the bbox was defined in the same coordinate space as the canvas
-            # or is already intended to be relative.
-            # For density search, we want the pattern to be relative.
-            cx = (cx - canvas_bounds[0]) / canvas_width
-            cy = (cy - canvas_bounds[1]) / canvas_height
-            width = width / canvas_width
-            height = height / canvas_height
-            is_relative = True
 
         # Generate oval polygon points (ellipse approximation)
         num_segments = 64  # Enough for smooth appearance
@@ -140,7 +130,9 @@ class Oval(Primitive2D):
             coords = np.vstack([coords, coords[0:1]])
 
         polygon = Polygon(coords=coords)
-        return ShapePattern(polygon, name=self.name, is_relative=is_relative)
+        return ShapePattern(
+            polygon, name=self.name, is_relative=self.is_relative, canvas=self.canvas
+        )
 
 
 class RegularPolygon(Primitive2D):
@@ -157,6 +149,7 @@ class RegularPolygon(Primitive2D):
         rotation: float = 0.0,
         canvas: Canvas | None = None,
         name: str | None = None,
+        is_relative: bool = False,
     ):
         """Initialize regular polygon.
 
@@ -168,6 +161,7 @@ class RegularPolygon(Primitive2D):
             canvas: Optional canvas to bound the polygon within. If provided,
                 the polygon will be scaled to fit within canvas (centered automatically).
             name: Optional descriptive name for the polygon pattern.
+            is_relative: Whether coordinates are in relative 0-1 space.
         """
         if sides < 3:
             raise ValueError(f"Regular polygon must have at least 3 sides, got {sides}")
@@ -180,6 +174,7 @@ class RegularPolygon(Primitive2D):
         self.rotation = rotation
         self.canvas = canvas
         self.name = name
+        self.is_relative = is_relative
 
     @classmethod
     def from_bbox(
@@ -213,6 +208,8 @@ class RegularPolygon(Primitive2D):
         # Radius is half of the smaller dimension (inscribed circle)
         radius = min(width, height) / 2
 
+        is_relative = all(0.0 <= v <= 1.0 for v in bbox)
+
         return cls(
             sides=sides,
             radius=radius,
@@ -220,6 +217,7 @@ class RegularPolygon(Primitive2D):
             rotation=0.0,
             canvas=canvas,
             name=name,
+            is_relative=is_relative,
         )
 
     @classmethod
@@ -247,19 +245,30 @@ class RegularPolygon(Primitive2D):
             RegularPolygon instance
         """
         if canvas is not None:
-            bounds = canvas.bounds()
-            cx = (bounds[0] + bounds[2]) / 2
-            cy = (bounds[1] + bounds[3]) / 2
-            x0 = cx - width / 2
-            y0 = cy - height / 2
-            x1 = cx + width / 2
-            y1 = cy + height / 2
+            if width <= 1.0 and height <= 1.0:
+                is_relative = True
+                cx, cy = 0.5, 0.5
+            else:
+                is_relative = False
+                bounds = canvas.bounds()
+                cx = (bounds[0] + bounds[2]) / 2
+                cy = (bounds[1] + bounds[3]) / 2
         else:
-            x0 = -width / 2
-            y0 = -height / 2
-            x1 = width / 2
-            y1 = height / 2
-        return cls.from_bbox(sides=sides, bbox=(x0, y0, x1, y1), canvas=canvas, name=name)
+            is_relative = False
+            cx, cy = 0.0, 0.0
+
+        # Radius is half of the smaller dimension
+        radius = min(width, height) / 2
+
+        return cls(
+            sides=sides,
+            radius=radius,
+            center=(cx, cy),
+            rotation=0.0,
+            canvas=canvas,
+            name=name,
+            is_relative=is_relative,
+        )
 
     def generate_pattern(self, **kwargs) -> ShapePattern:
         """Generate regular polygon.
@@ -271,22 +280,6 @@ class RegularPolygon(Primitive2D):
         radius = self.radius
         cx, cy = self.center
         rotation = self.rotation
-
-        is_relative = False
-        # If canvas is provided, we treat the center and radius as relative to that canvas
-        if self.canvas is not None:
-            canvas_bounds = self.canvas.bounds()
-            canvas_width = canvas_bounds[2] - canvas_bounds[0]
-            canvas_height = canvas_bounds[3] - canvas_bounds[1]
-
-            # Normalize coordinates to 0-1 relative to canvas
-            cx = (cx - canvas_bounds[0]) / canvas_width
-            cy = (cy - canvas_bounds[1]) / canvas_height
-            # Radius is tricky as it's 1D, we'll normalize it by width (arbitrary choice)
-            # but better to normalize x and y components if we had them.
-            # For now, let's assume uniform scaling.
-            radius = radius / canvas_width
-            is_relative = True
 
         # Generate regular polygon vertices
         # Start at angle 0 + rotation, evenly spaced around circle
@@ -301,4 +294,6 @@ class RegularPolygon(Primitive2D):
             coords = np.vstack([coords, coords[0:1]])
 
         polygon = Polygon(coords=coords)
-        return ShapePattern(polygon, name=self.name, is_relative=is_relative)
+        return ShapePattern(
+            polygon, name=self.name, is_relative=self.is_relative, canvas=self.canvas
+        )

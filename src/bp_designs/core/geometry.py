@@ -65,12 +65,23 @@ class Polygon(Geometry):
 class Canvas(Polygon):
     background_color: str | None = None
 
+    @property
+    def width(self):
+        bounds = self.bounds()
+        return bounds[2] - bounds[0]
+
+    @property
+    def height(self):
+        bounds = self.bounds()
+        return bounds[3] - bounds[1]
+
     def __str__(self) -> str:
         """Return concise string representation."""
-        bounds = self.bounds()
-        width = bounds[2] - bounds[0]
-        height = bounds[3] - bounds[1]
-        return f"Canvas({width:.0f}x{height:.0f})"
+        return f"Canvas({self.width:.0f}x{self.height:.0f})"
+
+    def with_background_color(self, color: str):
+        self.background_color = color
+        return self
 
     @classmethod
     def from_width_height(cls, width: int, height: int):

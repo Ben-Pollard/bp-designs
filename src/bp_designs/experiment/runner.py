@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import os
 import time
 from collections.abc import Callable
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -121,109 +123,142 @@ class ExperimentRunner:
 
         self.outputs_dir.mkdir(parents=True, exist_ok=True)
 
+    def _run_variant(
+        self,
+        variant_id: str,
+        params: dict[str, Any],
+        generator_fn: Callable[[dict[str, Any]], Polyline],
+    ) -> dict[str, Any] | None:
+        """Run a single experiment variant.
+
+        Args:
+            variant_id: Unique ID for this variant
+            params: Parameters for this variant
+            generator_fn: Function to generate the pattern
+
+        Returns:
+            None if successful, or a dict with error info if failed
+        """
+        try:
+            # Generate pattern. The generator_fn is now responsible for
+            # using the parameters correctly (e.g. passing them to the generator).
+            result = generator_fn(params)
+
+            # Save SVG. The pattern now knows how to render itself using its
+            # internal canvas and render_params.
+            svg_path = self.outputs_dir / f"{variant_id}.svg"
+            svg_string = result.to_svg()
+            svg_path.write_text(svg_string)
+
+            # Save metadata
+            metadata = {
+                "variant_id": variant_id,
+                "params": self._serialize_value(params),
+                "svg_path": f"outputs/{variant_id}.svg",
+            }
+
+            metadata_path = self.outputs_dir / f"{variant_id}.json"
+            metadata_path.write_text(json.dumps(metadata, indent=2))
+
+            # Export network data for debugging
+            if hasattr(result, "node_ids"):
+                data_path = self.outputs_dir / f"{variant_id}_data.json"
+                network_data = {
+                    "node_ids": result.node_ids.tolist(),
+                    "parents": result.parents.tolist(),
+                    "timestamps": result.timestamps.tolist(),
+                    "positions": result.positions.tolist(),
+                }
+                data_path.write_text(json.dumps(network_data))
+
+            return None
+
+        except Exception as e:
+            return {
+                "variant_id": variant_id,
+                "params": self._serialize_value(params),
+                "error": str(e),
+            }
+
     def run(
         self,
         grid: ParameterGrid,
         generator_fn: Callable[[dict[str, Any]], Polyline],
         max_variants: int | None = None,
+        parallel: bool = True,
+        num_workers: int | None = None,
     ) -> dict[str, Any]:
         """Run experiment across parameter grid.
 
-
-
         Args:
-
-
             grid: ParameterGrid defining combinations to test
-
-
             generator_fn: Function that takes params dict and returns Geometry
-
-
             max_variants: Optional limit on number of variants (for testing)
-
-
+            parallel: Whether to run variants in parallel
+            num_workers: Number of worker processes (defaults to CPU count)
 
         Returns:
-
-
             Experiment summary with metadata
         """
 
         print(f"\n{'=' * 60}")
-
         print(f"Experiment: {self.experiment_name}")
-
         print(f"{'=' * 60}")
-
         print(grid.summary())
-
         print(f"\n{'=' * 60}\n")
 
         # Limit variants if requested
-
         num_variants = len(grid) if max_variants is None else min(len(grid), max_variants)
-
         start_time = time.time()
-
         successes = 0
-
         failures = []
 
+        # Prepare variants
+        variants = []
         for i, params in enumerate(grid):
             if i >= num_variants:
                 break
-
             variant_id = f"var_{i + 1:04d}"
+            variants.append((variant_id, params))
 
-            print(f"[{i + 1}/{num_variants}] Generating {variant_id}...", end=" ")
+        if parallel and num_variants > 1:
+            workers = num_workers or os.cpu_count() or 1
+            print(f"Running {num_variants} variants in parallel using {workers} workers...")
 
-            try:
-                # Generate pattern. The generator_fn is now responsible for
-                # using the parameters correctly (e.g. passing them to the generator).
-                result = generator_fn(params)
-
-                # Save SVG. The pattern now knows how to render itself using its
-                # internal canvas and render_params.
-                svg_path = self.outputs_dir / f"{variant_id}.svg"
-                svg_string = result.to_svg()
-                svg_path.write_text(svg_string)
-
-                # Save metadata
-                metadata = {
-                    "variant_id": variant_id,
-                    "params": self._serialize_value(params),
-                    "svg_path": f"outputs/{variant_id}.svg",
+            with ProcessPoolExecutor(max_workers=workers) as executor:
+                # Submit all tasks
+                future_to_variant = {
+                    executor.submit(self._run_variant, vid, p, generator_fn): vid
+                    for vid, p in variants
                 }
 
-                metadata_path = self.outputs_dir / f"{variant_id}.json"
-                metadata_path.write_text(json.dumps(metadata, indent=2))
+                # Process results as they complete
+                for i, future in enumerate(as_completed(future_to_variant)):
+                    variant_id = future_to_variant[future]
+                    print(f"[{i + 1}/{num_variants}] Completed {variant_id}...", end=" ")
 
-                # Export network data for debugging
-                if hasattr(result, "node_ids"):
-                    data_path = self.outputs_dir / f"{variant_id}_data.json"
-                    network_data = {
-                        "node_ids": result.node_ids.tolist(),
-                        "parents": result.parents.tolist(),
-                        "timestamps": result.timestamps.tolist(),
-                        "positions": result.positions.tolist(),
-                    }
-                    data_path.write_text(json.dumps(network_data))
-
-                print("✓")
-
-                successes += 1
-
-            except Exception as e:
-                print(f"✗ ({e})")
-
-                failures.append(
-                    {
-                        "variant_id": variant_id,
-                        "params": self._serialize_value(params),
-                        "error": str(e),
-                    }
-                )
+                    try:
+                        error_info = future.result()
+                        if error_info:
+                            print(f"✗ ({error_info['error']})")
+                            failures.append(error_info)
+                        else:
+                            print("✓")
+                            successes += 1
+                    except Exception as e:
+                        print(f"✗ (Critical error: {e})")
+                        failures.append({"variant_id": variant_id, "error": str(e)})
+        else:
+            # Sequential execution
+            for i, (variant_id, params) in enumerate(variants):
+                print(f"[{i + 1}/{num_variants}] Generating {variant_id}...", end=" ")
+                error_info = self._run_variant(variant_id, params, generator_fn)
+                if error_info:
+                    print(f"✗ ({error_info['error']})")
+                    failures.append(error_info)
+                else:
+                    print("✓")
+                    successes += 1
 
         elapsed = time.time() - start_time
 
@@ -238,6 +273,15 @@ class ExperimentRunner:
             "failures": failures,
             "elapsed_seconds": elapsed,
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "parameters": {
+                "varied": {
+                    name: self._serialize_value(
+                        [combo[name] for combo in grid.combinations]
+                    )
+                    for name in grid.varied_params
+                },
+                "fixed": self._serialize_value(grid.fixed_params),
+            },
         }
 
         config_path = self.exp_dir / "config.json"

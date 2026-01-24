@@ -17,7 +17,7 @@ def generate_pattern(params: dict):
     gen = RegularPolygon(**params)
     # Generate pattern using stored parameters
     shape_pattern = gen.generate_pattern()
-    return shape_pattern.to_geometry()
+    return shape_pattern
 
 
 def main():

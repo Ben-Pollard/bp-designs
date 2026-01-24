@@ -83,5 +83,7 @@
 - **Parameter Coupling**: Use a unified parameter space with namespacing (e.g., `network.num_attractions`, `render.bg_color`) instead of rigid categories. This allows any parameter to depend on any other via `derived` functions, ensuring perfect coupling across complex compositions.
 - **Parameter Routing**: Experiment scripts should handle the routing of namespaced parameters to their respective generators using helpers like `split_params()`. This keeps the core generator logic clean and focused on the algorithm.
 - **Distribution Strategies**: Organ distribution is a property of the network structure, not the organs themselves. Distribution strategies should be implemented where they can access the network's semantic information (like leaf nodes or branch hierarchy).
+- **Semantic Mapping**: When working with refined or modified networks, always map `node_ids` to array indices using a lookup table (e.g., `id_to_idx`). Never assume that a node's ID corresponds to its position in the data arrays, as refinement steps like decimation and subdivision break this relationship.
+- **Robust Distribution**: Rhythmic distribution should use stable properties like hierarchical `depth` rather than `timestamps`, especially when the network has been subdivided, to avoid clustering artifacts.
 
 ---

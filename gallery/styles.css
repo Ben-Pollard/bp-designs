@@ -201,6 +201,46 @@ body {
     line-height: 1.6;
 }
 
+.fixed-params-section {
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--border-color);
+}
+
+.fixed-params-section h4 {
+    font-size: 14px;
+    color: var(--primary-color);
+    margin-bottom: var(--spacing-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.fixed-params-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--spacing-sm);
+}
+
+.fixed-param {
+    display: flex;
+    gap: var(--spacing-xs);
+    font-size: 13px;
+    background: #f8f9fa;
+    padding: 6px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+
+.fixed-param .param-name {
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.fixed-param .param-value {
+    color: var(--text-primary);
+    font-family: 'Monaco', 'Menlo', monospace;
+}
+
 /* Variants Section */
 .variants-section {
     margin-bottom: var(--spacing-lg);

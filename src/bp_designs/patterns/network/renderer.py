@@ -65,12 +65,17 @@ class NetworkRenderer:
 
         leaves = self.network.get_leaves()
         branches = []
+        id_to_idx = {node_id: i for i, node_id in enumerate(self.network.node_ids)}
         for leaf_idx in leaves:
             path = []
-            current = leaf_idx
-            while current != -1:
-                path.append(positions[current])
-                current = self.network.parents[current]
+            curr_idx = leaf_idx
+            while curr_idx != -1:
+                path.append(positions[curr_idx])
+                parent_id = self.network.parents[curr_idx]
+                if parent_id == -1:
+                    curr_idx = -1
+                else:
+                    curr_idx = id_to_idx.get(parent_id, -1)
             if len(path) >= 2:
                 branches.append(np.array(path[::-1]))
         return Polyline(polylines=branches)
@@ -88,17 +93,14 @@ class NetworkRenderer:
         from shapely.geometry import Point as ShapelyPoint
         from shapely.ops import unary_union
 
-        if self.network.thickness is not None and len(self.network.thickness) == len(self.network.node_ids):
-            all_thickness = self.network.thickness
-        else:
-            strategy = BranchThicknessStrategy.from_name(
-                thickness,
-                min_thickness=min_thickness,
-                max_thickness=max_thickness,
-                power=taper_power,
-                mode=thickness_mode,
-            )
-            all_thickness = strategy.compute_thickness(self.network)
+        strategy = BranchThicknessStrategy.from_name(
+            thickness,
+            min_thickness=min_thickness,
+            max_thickness=max_thickness,
+            power=taper_power,
+            mode=thickness_mode,
+        )
+        all_thickness = strategy.compute_thickness(self.network)
 
         shapes = []
         id_to_idx = {node_id: i for i, node_id in enumerate(self.network.node_ids)}
@@ -144,18 +146,17 @@ class NetworkRenderer:
             style_dict.update(kwargs)
             style = NetworkStyle.from_dict(style_dict)
 
-        if self.network.thickness is not None and len(self.network.thickness) == len(self.network.node_ids):
-            all_thickness = self.network.thickness
-        else:
-            strategy = BranchThicknessStrategy.from_name(
-                style.thickness,
-                min_thickness=style.min_thickness,
-                max_thickness=style.max_thickness,
-                power=style.taper_power,
-                mode=style.thickness_mode,
-            )
-            all_thickness = strategy.compute_thickness(self.network)
+        # Always use strategy for thickness unless explicitly overridden (not implemented yet)
+        strategy = BranchThicknessStrategy.from_name(
+            style.thickness,
+            min_thickness=style.min_thickness,
+            max_thickness=style.max_thickness,
+            power=style.taper_power,
+            mode=style.thickness_mode,
+        )
+        all_thickness = strategy.compute_thickness(self.network)
 
+        # Always use strategy for color if provided
         if style.color_strategy is not None:
             strategy = ColorStrategy.from_name(
                 style.color_strategy,
@@ -163,8 +164,6 @@ class NetworkRenderer:
                 end_color=style.end_color,
             )
             all_colors = strategy.compute_colors(self.network)
-        elif self.network.colors is not None and len(self.network.colors) == len(self.network.node_ids):
-            all_colors = self.network.colors
         else:
             default_color = style.color if style.color is not None else "#000000"
             all_colors = np.full(len(self.network.node_ids), default_color, dtype=object)

@@ -6,6 +6,7 @@ import numpy as np
 from scipy.spatial import Voronoi
 
 from bp_designs.core.generator import Generator
+from bp_designs.core.geometry import Canvas
 from bp_designs.patterns.cells import Cells
 
 
@@ -25,6 +26,7 @@ class VoronoiTessellation(Generator):
         width: float = 100.0,
         height: float = 100.0,
         boundary_margin: float = 20.0,
+        canvas: Canvas | None = None,
     ):
         """Initialize Voronoi tessellation generator.
 
@@ -36,6 +38,7 @@ class VoronoiTessellation(Generator):
             width: Canvas width
             height: Canvas height
             boundary_margin: Margin outside canvas for mirror sites (prevents edge artifacts)
+            canvas: Optional canvas for coordinate system
         """
         self.seed = seed
         self.rng = np.random.default_rng(seed)
@@ -46,6 +49,7 @@ class VoronoiTessellation(Generator):
         self.width = width
         self.height = height
         self.boundary_margin = boundary_margin
+        self.canvas = canvas or Canvas.from_width_height(int(width), int(height))
 
         # Validate parameters
         if render_mode not in ["edges", "cells", "both"]:
@@ -79,7 +83,13 @@ class VoronoiTessellation(Generator):
 
         # Return Cells instance
         bounds = (0, 0, self.width, self.height)
-        return Cells(sites=sites, vor=vor, pattern_bounds=bounds, render_mode=self.render_mode)
+        return Cells(
+            sites=sites,
+            vor=vor,
+            pattern_bounds=bounds,
+            render_mode=self.render_mode,
+            canvas=self.canvas,
+        )
 
     # Backward compatibility alias
     def generate(self) -> Cells:

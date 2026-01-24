@@ -43,7 +43,7 @@ class BranchNetwork(Pattern):
     organ_distribution: str | Any = "terminal"  # Strategy for automatic organ attachment
 
     def __post_init__(self):
-        """Validate structure and attach organs if template provided."""
+        """Validate structure."""
         n = len(self.positions)
         assert self.parents.shape == (n,), f"parents must be ({n},), got {self.parents.shape}"
         assert self.timestamps.shape == (n,), f"timestamps must be ({n},), got {self.timestamps.shape}"
@@ -51,21 +51,29 @@ class BranchNetwork(Pattern):
         if self.thickness is not None:
             assert self.thickness.shape == (n,), f"thickness must be ({n},), got {self.thickness.shape}"
 
-        # Automatically attach organs if template is provided and organs not already set
-        if self.organ_template is not None and self.organs is None:
-            self.attach_organs(self.organ_template, self.organ_distribution)
+    def replace(self, **changes) -> BranchNetwork:
+        """Create a new instance with updated fields, preserving others.
+
+        This is a semantic-aware version of dataclasses.replace that ensures
+        cached properties are cleared and all state is carried over.
+        """
+        from dataclasses import replace
+
+        return replace(self, **changes)
 
     @cached_property
     def depths(self) -> np.ndarray:
         """Hierarchy depth from root for each node."""
         n = len(self.parents)
         depths = np.zeros(n, dtype=int)
+        id_to_idx = {node_id: i for i, node_id in enumerate(self.node_ids)}
         for i in range(n):
             depth = 0
-            current = i
-            while self.parents[current] != -1:
+            curr_idx = i
+            while self.parents[curr_idx] != -1:
                 depth += 1
-                current = self.parents[current]
+                parent_id = self.parents[curr_idx]
+                curr_idx = id_to_idx[parent_id]
                 if depth > n:  # Cycle detection
                     raise ValueError(f"Cycle detected at node {i}")
             depths[i] = depth
@@ -76,13 +84,18 @@ class BranchNetwork(Pattern):
         """Assign branch ID to each node by tracing from leaves to roots."""
         n = len(self.parents)
         branch_ids = np.full(n, -1, dtype=int)
+        id_to_idx = {node_id: i for i, node_id in enumerate(self.node_ids)}
         leaves = self.get_leaves()
         next_branch_id = 0
-        for leaf in leaves:
-            current = leaf
-            while current != -1 and branch_ids[current] == -1:
-                branch_ids[current] = next_branch_id
-                current = self.parents[current]
+        for leaf_idx in leaves:
+            curr_idx = leaf_idx
+            while curr_idx != -1 and branch_ids[curr_idx] == -1:
+                branch_ids[curr_idx] = next_branch_id
+                parent_id = self.parents[curr_idx]
+                if parent_id == -1:
+                    curr_idx = -1
+                else:
+                    curr_idx = id_to_idx[parent_id]
             next_branch_id += 1
         return branch_ids
 
@@ -148,7 +161,7 @@ class BranchNetwork(Pattern):
         return branch_positions[order]
 
     def get_leaves(self) -> np.ndarray:
-        is_parent = np.isin(np.arange(self.num_nodes), self.parents)
+        is_parent = np.isin(self.node_ids, self.parents)
         return np.where(~is_parent)[0]
 
     def get_roots(self) -> np.ndarray:
@@ -160,6 +173,7 @@ class BranchNetwork(Pattern):
             positions=self.positions[selection],
             parents=self.parents[selection],
             timestamps=self.timestamps[selection],
+            canvas=self.canvas,
             pattern_bounds=self.pattern_bounds,
             organ_template=self.organ_template,
             organ_distribution=self.organ_distribution,
@@ -176,42 +190,40 @@ class BranchNetwork(Pattern):
         fix_roots: bool = True,
         fix_leaves: bool = True,
     ) -> BranchNetwork:
+        """Relocate nodes toward their parents to reduce branching angles.
+
+        This implements the basal relocation described in Runions et al. (2007).
+        """
         if self.num_nodes <= 1:
             return self
+
         new_positions = self.positions.copy()
         to_move = np.ones(self.num_nodes, dtype=bool)
         if fix_roots:
             to_move[self.get_roots()] = False
         if fix_leaves:
             to_move[self.get_leaves()] = False
+
         id_to_idx = {node_id: i for i, node_id in enumerate(self.node_ids)}
         has_parent = self.parents != -1
         child_indices = np.where(has_parent)[0]
         parent_ids = self.parents[has_parent]
         parent_indices = np.array([id_to_idx[pid] for pid in parent_ids])
+
+        move_mask = has_parent & to_move
+
         for _ in range(iterations):
-            neighbor_sum = np.zeros_like(new_positions)
-            neighbor_count = np.zeros(self.num_nodes)
-            np.add.at(neighbor_sum, child_indices, new_positions[parent_indices])
-            np.add.at(neighbor_count, child_indices, 1)
-            np.add.at(neighbor_sum, parent_indices, new_positions[child_indices])
-            np.add.at(neighbor_count, parent_indices, 1)
-            mask = neighbor_count > 0
-            avg_positions = np.zeros_like(new_positions)
-            avg_positions[mask] = neighbor_sum[mask] / neighbor_count[mask, None]
-            move_mask = mask & to_move
-            new_positions[move_mask] = (1 - alpha) * new_positions[move_mask] + alpha * avg_positions[
+            # Move each node toward its parent
+            target_positions = new_positions.copy()
+            target_positions[child_indices] = new_positions[parent_indices]
+
+            new_positions[move_mask] = (1 - alpha) * new_positions[move_mask] + alpha * target_positions[
                 move_mask
             ]
-        return BranchNetwork(
-            node_ids=self.node_ids.copy(),
+
+        return self.replace(
             positions=new_positions,
-            parents=self.parents.copy(),
-            timestamps=self.timestamps.copy(),
-            pattern_bounds=self.pattern_bounds,
             thickness=self.thickness.copy() if self.thickness is not None else None,
-            organ_template=self.organ_template,
-            organ_distribution=self.organ_distribution,
         )
 
     def subdivide(self) -> BranchNetwork:
@@ -233,56 +245,76 @@ class BranchNetwork(Pattern):
         updated_parents = self.parents.copy()
         updated_parents[child_indices] = new_node_ids
         new_parents = parent_ids
-        new_thickness = None
-        if self.thickness is not None:
-            new_thickness_vals = (self.thickness[parent_indices] + self.thickness[child_indices]) / 2.0
-            new_thickness = np.concatenate([self.thickness, new_thickness_vals])
-        return BranchNetwork(
+        return self.replace(
             node_ids=np.concatenate([self.node_ids, new_node_ids]),
             positions=np.concatenate([self.positions, midpoints]),
             parents=np.concatenate([updated_parents, new_parents]),
             timestamps=np.concatenate([self.timestamps, new_timestamps]),
-            pattern_bounds=self.pattern_bounds,
-            thickness=new_thickness,
-            organ_template=self.organ_template,
-            organ_distribution=self.organ_distribution,
+            thickness=None,
+            colors=None,
         )
 
     def decimate(self, min_distance: float = 1.0) -> BranchNetwork:
+        """Remove nodes that are too close to their parents.
+
+        Uses an iterative topological pass to allow segments to accumulate length,
+        avoiding the 'all or nothing' issue with fixed-length growth.
+        """
         if self.num_nodes <= 1:
             return self
-        has_parent = self.parents != -1
-        child_indices = np.where(has_parent)[0]
-        parent_ids = self.parents[has_parent]
+
+        # Sort nodes by depth to ensure we process parents before children
+        depths = self.depths
+        order = np.argsort(depths)
+
         id_to_idx = {node_id: i for i, node_id in enumerate(self.node_ids)}
-        parent_indices = np.array([id_to_idx[pid] for pid in parent_ids])
-        dists = np.linalg.norm(self.positions[child_indices] - self.positions[parent_indices], axis=1)
+        new_parents = self.parents.copy()
         to_remove_mask = np.zeros(self.num_nodes, dtype=bool)
-        to_remove_mask[child_indices[dists < min_distance]] = True
-        to_remove_mask[self.get_roots()] = False
+
+        for idx in order:
+            parent_id = new_parents[idx]
+            if parent_id == -1:
+                continue
+
+            parent_idx = id_to_idx[parent_id]
+            dist = np.linalg.norm(self.positions[idx] - self.positions[parent_idx])
+
+            if dist < min_distance:
+                to_remove_mask[idx] = True
+                # Re-parent children of this node to its parent
+                node_id = self.node_ids[idx]
+                children_mask = new_parents == node_id
+                new_parents[children_mask] = parent_id
+
         if not np.any(to_remove_mask):
             return self
-        new_parents = self.parents.copy()
-        for i in range(self.num_nodes):
-            if self.parents[i] == -1:
-                continue
-            curr_parent_id = self.parents[i]
-            while curr_parent_id != -1:
-                curr_parent_idx = id_to_idx[curr_parent_id]
-                if not to_remove_mask[curr_parent_idx]:
-                    break
-                curr_parent_id = self.parents[curr_parent_idx]
-            new_parents[i] = curr_parent_id
+
         keep_mask = ~to_remove_mask
-        return BranchNetwork(
+
+        # Map old parent IDs to their new values (which might be -1 or other kept IDs)
+        # We need to ensure that the final parents array only contains IDs that are in the kept node_ids.
+        # The iterative re-parenting above already ensures this because we only re-parent to the parent
+        # of the removed node, and we process in topological order.
+        # However, we must convert the parent IDs to the new indices if we were using indices,
+        # but our BranchNetwork uses IDs for parents, so we just need to filter.
+
+        # Filter organs to keep only those on remaining nodes
+        new_organs = None
+        if self.organs:
+            new_organs = {
+                node_id: organ
+                for node_id, organ in self.organs.items()
+                if node_id in self.node_ids[keep_mask]
+            }
+
+        return self.replace(
             node_ids=self.node_ids[keep_mask],
             positions=self.positions[keep_mask],
             parents=new_parents[keep_mask],
             timestamps=self.timestamps[keep_mask],
-            pattern_bounds=self.pattern_bounds,
-            thickness=self.thickness[keep_mask] if self.thickness is not None else None,
-            organ_template=self.organ_template,
-            organ_distribution=self.organ_distribution,
+            thickness=None,
+            colors=None,
+            organs=new_organs,
         )
 
     # ============================================================================
@@ -294,7 +326,14 @@ class BranchNetwork(Pattern):
 
         if self.organs is None:
             self.organs = {}
-        strategy = OrganDistributionStrategy.from_name(distribution, **kwargs.pop("distribution_params", {}))
+
+        # If distribution is already a strategy, use it. Otherwise, create from name.
+        if isinstance(distribution, OrganDistributionStrategy):
+            strategy = distribution
+        else:
+            dist_params = kwargs.pop("distribution_params", {})
+            strategy = OrganDistributionStrategy.from_name(distribution, **dist_params)
+
         new_organs = strategy.generate_organs(self, organ_template, **kwargs)
         for node_id, organ in new_organs:
             self.organs[node_id] = organ

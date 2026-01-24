@@ -3,6 +3,7 @@
 Explores key parameters: num_sites, relaxation_iterations, render_mode.
 """
 
+from bp_designs.core.geometry import Canvas
 from bp_designs.experiment.params import ParameterSpace
 from bp_designs.experiment.runner import ExperimentRunner
 from bp_designs.generators.cellular.voronoi import VoronoiTessellation
@@ -11,7 +12,7 @@ from bp_designs.generators.cellular.voronoi import VoronoiTessellation
 def generate_pattern(params: dict):
     """Generate pattern from parameters."""
     gen = VoronoiTessellation(**params)
-    return gen.generate_pattern().to_geometry()
+    return gen.generate_pattern()
 
 
 def main():
@@ -27,6 +28,7 @@ def main():
             "width": 100.0,
             "height": 100.0,
             "boundary_margin": 20.0,
+            "canvas": Canvas.from_width_height(100, 100),
         },
     )
 

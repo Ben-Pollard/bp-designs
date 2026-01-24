@@ -63,6 +63,18 @@ class ParameterSpace:
         Returns:
             ParameterGrid with all combinations
         """
+        # Identify varied and fixed parameters from specs
+        varied_params = []
+        fixed_params = {}
+        for name, spec in self.specs.items():
+            # Match logic in expand_spec: list or (min, max, steps) tuple
+            # A parameter is only varied if it has more than one value
+            expanded_values = self.expand_spec(name, spec)
+            if len(expanded_values) > 1:
+                varied_params.append(name)
+            else:
+                fixed_params[name] = expanded_values[0]
+
         # Expand all specifications
         expanded = {}
         for param_name, spec in self.specs.items():
@@ -90,6 +102,8 @@ class ParameterSpace:
         return ParameterGrid(
             space_name=self.name,
             param_names=param_names,
+            varied_params=varied_params,
+            fixed_params=fixed_params,
             derived_param_names=list(self.derived.keys()),
             combinations=combinations,
         )
@@ -104,6 +118,8 @@ class ParameterGrid:
 
     space_name: str
     param_names: list[str]
+    varied_params: list[str]
+    fixed_params: dict[str, Any]
     combinations: list[dict[str, Any]]
     derived_param_names: list[str] = field(default_factory=list)
 
