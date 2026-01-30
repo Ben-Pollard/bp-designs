@@ -30,6 +30,7 @@ class Scene(Pattern):
     """A composite pattern that manages multiple layers and a canvas."""
 
     def __init__(self, canvas: Canvas):
+        super().__init__(canvas=canvas)
         self.canvas = canvas
         self.layers: list[Layer] = []
 
@@ -56,9 +57,15 @@ class Scene(Pattern):
         # Render layers in order
         for layer in self.layers:
             if layer.visible:
-                context.push_group(layer.name)
                 # Merge layer params with global kwargs, layer params take precedence
                 render_params = {**kwargs, **layer.params}
+
+                # Extract SVG group attributes (like transform) from render_params
+                group_attrs = {}
+                if "transform" in render_params:
+                    group_attrs["transform"] = render_params.pop("transform")
+
+                context.push_group(layer.name, **group_attrs)
                 layer.pattern.render(context, **render_params)
                 context.pop_group()
 

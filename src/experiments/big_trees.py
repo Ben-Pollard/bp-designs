@@ -1,5 +1,7 @@
 """Experiment demonstrating blossoms on branching networks."""
 
+from random import randint
+
 import numpy as np
 
 from bp_designs.core.color import Color
@@ -33,12 +35,11 @@ def main():
 
     boundaries = []
 
-    # 1. Width/height construction (centered in canvas)
+    # LAYOUT: This determines the boundary for tree growth.
     oval1 = Oval.from_bbox([0.1, 0.1, 0.9, 0.8], canvas=ref_canvas, name="Wide oval above center")
     boundaries.append(oval1.generate_pattern())
 
 
-    # Define possible root positions as relative PointPatterns
     root_positions = [
         PointPattern(0.5, 1.0, is_relative=True, name="Bottom Center"),
         # PointPattern(0.45, 1.0, is_relative=True, name="Bottom Left"),
@@ -53,9 +54,10 @@ def main():
     root_pos = PointPattern(0.5, 1.0, is_relative=True, name="Bottom Center")
 
     leaf_gen = LeafGenerator()
-    leaf_template = leaf_gen.generate_pattern(base_color=Color.from_hex("#4a7c44"), scale=80.0)
+    leaf_templates = [leaf_gen.generate_pattern(base_color=Color.from_hex(b), scale=70.0) for b in ["#2D936C", "#F08700"]]
 
     blossom_gen = BlossomGenerator()
+    # TODO: Integrate a new color palette function based on pink, yellow, and green.
     blossom_templates = [blossom_gen.generate_pattern(
         base_color=Color.from_hex(b),
         scale=4.0,
@@ -66,17 +68,23 @@ def main():
         center_color=c,
         jitter=0.1,
         overlap=1.2
-    ) for b,c in [("#ffb7c5","#ffcc00"), ("#ffcc00", "#ffb7c5")]]
+    ) for b,c in [("#F4BBD3","#FEFA86"), ("#FEFA86", "#F4BBD3")]]
+
+    bg_dict = {
+        "#F4BBD3": "#FEFA86",
+        "#FEFA86": "#F4BBD3",
+        "#2D936C": "#F08700",
+        "#F08700": "#F4BBD3"
+    }
 
 
     space = ParameterSpace(
         name="big_trees",
         specs={
             # Network structural parameters
-            "network.num_attractions": [10],
+            # "network.num_attractions": [10],
             "network.segment_length": [2.5],
             "network.kill_distance": [2],
-            "network.seed": [42],
             "network.canvas": [ref_canvas],
             "network.max_iterations": [500],
             "network.initial_boundary": boundaries,
@@ -86,20 +94,21 @@ def main():
             "refinement.subdivide": [True],
             "refinement.alpha": [0.5],
             "refinement.it": [3],
-            "network.organ_template": blossom_templates + [leaf_template],
+            "network.organ_template": blossom_templates + leaf_templates,
             "network.organ_distribution": ["terminal"],
             "render.distribution_params": [
                 {"min_depth_ratio": 0.33, "random_chance": 0.5},
             ],
             # Rendering parameters
-            "render.render_mode": "polyline",
+            "render.render_mode": "polygon",
             "render.taper_style": "smooth",
             "render.shading": "linear",
             "render.color_strategy": "depth",
             "render.thickness": "descendant",
-            "render.start_color": "#3d2b1f",
-            "render.end_color": "#5d4037",
+            "render.start_color": "#694A38",
+            "render.end_color": "#5B4B49",
             # Lighting parameters
+            # TODO: Adjust lighting directions (left panels with light from top right, and right panels vice-versa).
             "render.light_angle": [45],
             "render.highlight_amount": [0.2],
             "render.shadow_amount": [0.2],
@@ -108,8 +117,8 @@ def main():
         },
         derived={
             # Create the LightingModel object from parameters
-            "render.background_color": lambda p: p["network.organ_template"]
-            .base_color.complementary()
+            "render.background_color": lambda p: Color.from_hex(bg_dict.get(p["network.organ_template"]
+            .base_color.to_hex().upper()))#.complementary()
             .with_hsl(s=p["render.bg_saturation"], lightness=p["render.bg_lightness"]),
             "render.lighting": lambda p: DirectionalLighting(
                 light_direction=np.array([
@@ -122,7 +131,10 @@ def main():
             "network.refinement_strategy": lambda p: NetworkRefinementStrategy(
         decimate_min_distance=p['refinement.dist'], subdivide=p['refinement.subdivide'], relocate_alpha=p['refinement.alpha'], relocate_iterations=p['refinement.it']),
         "render.max_thickness": lambda p: p['network.canvas'].width / 20,
-        "render.min_thickness": lambda p: 1.0
+        "render.min_thickness": lambda p: 1.0,
+        "network.seed": lambda p: randint(1,100),
+        "network.num_attractions": lambda p: randint(10, 20),
+        "refinement.dist": randint(5, 15)
 
         },
     )

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from bp_designs.core.color import Color
 from bp_designs.core.geometry import Canvas, Point, Polygon, Polyline
 from bp_designs.core.pattern import Pattern
 from bp_designs.core.renderer import RenderingContext, RenderStyle
@@ -58,8 +59,8 @@ class ShapeStyle(RenderStyle):
     """Structured rendering parameters for shapes."""
 
     stroke_width: float = 0.5
-    stroke_color: str = "#000000"
-    fill: str | None = None
+    stroke_color: str | Color = "#000000"
+    fill: str | Color | None = None
     stroke_linecap: str = "round"
     stroke_linejoin: str = "round"
 
@@ -201,12 +202,18 @@ class ShapePattern(Pattern):
         svg_attrs = style.get_svg_attributes()
 
         # Draw polygon
+        # Apply lighting if available
+        fill = style.fill if style.fill is not None else "none"
+        if context.lighting and fill != "none":
+            fill = context.lighting.get_fill(fill, {"type": "global"})
+
+        # Draw polygon
         context.add(
             context.dwg.polygon(
                 points=points,
-                stroke=style.stroke_color,
+                stroke=str(style.stroke_color),
                 stroke_width=style.stroke_width,
-                fill=style.fill if style.fill is not None else "none",
+                fill=str(fill),
                 stroke_linecap=style.stroke_linecap,
                 stroke_linejoin=style.stroke_linejoin,
                 **svg_attrs,

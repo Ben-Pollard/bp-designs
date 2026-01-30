@@ -26,12 +26,19 @@
   - [x] Coupled background colors via ParameterSpace
   - [x] Refactor `BranchNetwork` into a modular package (`bp_designs.patterns.network`)
 
-### Phase 1b: Tree Fixes
-- [ ] Use thickness strategy
-- [ ] Use refinement
-- [ ] Fix output exceeding canvas size 
+### Phase 1b: Composition refinement
+- [x] Network shouldn't own the background
+- [x] Generalisise layering so network can layer organs with background + border using same mechanism outside of network context
+- [x] What is a canvas? Distinct from rectangle? What if we add background + border?
+- [x] Abstract multi-item generation from experiment context to return items for layering
+- [x] Top-level abstraction - canvases on canvases or just layered items?
 
-### Phase 1c: Trees Experimentation
+### Phase 1c: Tree Fixes
+- [x] Use thickness strategy
+- [x] Use refinement
+- [ ] Fix output exceeding background size 
+
+### Phase 1d: Trees Experimentation
 - [ ] Generate ideas
 - [ ] Non-tree applications
   - [ ] Rivers (noise the growth vector)
