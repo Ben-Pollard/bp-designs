@@ -137,13 +137,23 @@ class NetworkRenderer:
         **kwargs,
     ):
         """Render branch network into the provided context."""
-        # Merge style and kwargs
+        # Prioritize parameters:
+        # 1. Provided style object
+        # 2. Stored render_params on the network
+        # 3. kwargs passed to this method (global context)
+
+        # Start with stored params
+        params = self.network.render_params.copy()
+        # Update with kwargs (overrides/global context)
+        params.update(kwargs)
+
+        # Merge style and params
         if style is None:
-            style = NetworkStyle.from_dict(kwargs)
+            style = NetworkStyle.from_dict(params)
         else:
-            # Allow kwargs to override style fields
+            # Allow params to override style fields
             style_dict = style.model_dump()
-            style_dict.update(kwargs)
+            style_dict.update(params)
             style = NetworkStyle.from_dict(style_dict)
 
         # Always use strategy for thickness unless explicitly overridden (not implemented yet)

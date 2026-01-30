@@ -183,12 +183,22 @@ class ShapePattern(Pattern):
         **kwargs,
     ):
         """Render shape into the provided context."""
-        # Merge style and kwargs
+        # Prioritize parameters:
+        # 1. Provided style object
+        # 2. Stored render_params on the pattern
+        # 3. kwargs passed to this method (global context)
+
+        # Start with stored params
+        params = self.render_params.copy()
+        # Update with kwargs (overrides/global context)
+        params.update(kwargs)
+
+        # Merge style and params
         if style is None:
-            style = ShapeStyle.from_dict(kwargs)
+            style = ShapeStyle.from_dict(params)
         else:
             style_dict = style.model_dump()
-            style_dict.update(kwargs)
+            style_dict.update(params)
             style = ShapeStyle.from_dict(style_dict)
 
         # Get polygon coordinates, ensure closed

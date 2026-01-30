@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import ABC
 from dataclasses import dataclass
 
@@ -99,6 +101,22 @@ class Canvas(Polygon):
     @classmethod
     def from_size(cls, size: int):
         return cls.from_width_height(size, size)
+
+    def sub_canvas(self, x: float, y: float, width: float, height: float) -> Canvas:
+        """Create a new canvas representing a sub-region of this canvas.
+
+        The coordinates are absolute relative to the global coordinate system.
+        """
+        coords = np.array(
+            [
+                [x, y],
+                [x + width, y],
+                [x + width, y + height],
+                [x, y + height],
+                [x, y],
+            ]
+        )
+        return self.__class__(coords=coords)
 
 
 @dataclass

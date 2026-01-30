@@ -34,7 +34,7 @@ if __name__ == "__main__":
     scene = Scene(global_canvas, render_params={"lighting": lighting})
 
     # We'll create a 2x2 grid of trees
-    cell_size = 1000
+
 
     bg_dict = {
         "#F4BBD3": "#FEFA86",
@@ -52,11 +52,11 @@ if __name__ == "__main__":
             'organ': leaf_gen.generate_pattern(base_color=Color.from_hex("#2D936C"), scale=70.0),
         },
         {
-            'cell': (0, 1),
-            'organ': leaf_gen.generate_pattern(base_color=Color.from_hex("#2D936C"), scale=70.0),
+            'cell': (1, 0),
+            'organ': leaf_gen.generate_pattern(base_color=Color.from_hex("#F08700"), scale=70.0),
         },
         {
-            'cell': (1, 0),
+            'cell': (1, 1),
             'organ': blossom_gen.generate_pattern(
                 base_color=Color.from_hex("#F4BBD3"),
                 scale=4.0,
@@ -70,7 +70,7 @@ if __name__ == "__main__":
             ),
         },
         {
-            'cell': (1, 1),
+            'cell': (0, 1),
             'organ': blossom_gen.generate_pattern(
                 base_color=Color.from_hex("#FEFA86"),
                 scale=4.0,
@@ -89,8 +89,14 @@ if __name__ == "__main__":
         i, j = p['cell']
         organ = p['organ']
 
-        # Local scene
-        local_canvas = Canvas.from_size(cell_size)
+        # Local scene using sub_canvas for placement
+        cell_size = 1000
+        local_canvas = global_canvas.sub_canvas(
+            x=j * cell_size,
+            y=i * cell_size,
+            width=cell_size,
+            height=cell_size
+        )
         tree_scene = Scene(local_canvas)
 
         # Define boundaries for this local canvas
@@ -100,18 +106,18 @@ if __name__ == "__main__":
         # Create generator
         gen = SpaceColonization(
             canvas=local_canvas,
-            root_position=PointPattern(0.5, 1.0, is_relative=True),
+            root_position=PointPattern(0.5, 0.98, is_relative=True),
             initial_boundary=boundary,
             final_boundary=boundary,
-            num_attractions=15,
+            num_attractions=random.randint(10, 20),
             segment_length=5,
             kill_distance=4,
             max_iterations=300,
             seed=random.randint(0, 100),
             refinement_strategy=NetworkRefinementStrategy(
-                decimate_min_distance=15,
+                decimate_min_distance=random.randint(5, 15),
                 subdivide=True,
-                relocate_alpha=0.2,
+                relocate_alpha=0.5,
                 relocate_iterations=3
             ),
             organ_template=organ,
@@ -126,7 +132,10 @@ if __name__ == "__main__":
             shading="linear",
             color_strategy="depth",
             thickness="descendant",
-            max_thickness=50.0
+            max_thickness=cell_size / 20,
+            min_thickness=1,
+            start_color="#694A38",
+            end_color="#5B4B49"
         )
         tree = gen.generate_pattern(**network_style.model_dump())
 
@@ -134,7 +143,7 @@ if __name__ == "__main__":
         tree_scene.add_layer(
             f"bg_{i}_{j}",
             rect_gen.generate_pattern(),
-            fill=Color.from_hex(bg_dict[organ.base_color.to_hex().upper()]).with_hsl(s=0.2, lightness=0.95)
+            fill=Color.from_hex(bg_dict[organ.base_color.to_hex().upper()]).with_hsl(s=0.2, lightness=0.9)
         )
 
         # Add tree to local scene
@@ -149,13 +158,10 @@ if __name__ == "__main__":
             fill="none"
         )
 
-        # 4. Add the local scene to the global scene with a transform
-        tx = j * cell_size
-        ty = i * cell_size
+        # 4. Add the local scene to the global scene
         scene.add_layer(
             f"slot_{i}_{j}",
-            tree_scene,
-            transform=f"translate({tx}, {ty})"
+            tree_scene
         )
 
     output_dir = Path("output/composition")

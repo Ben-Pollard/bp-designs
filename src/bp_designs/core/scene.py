@@ -54,19 +54,16 @@ class Scene(Pattern):
                 )
             )
 
+        # Extract global context from scene's own render_params or kwargs
+        lighting = kwargs.get("lighting") or self.render_params.get("lighting")
+
         # Render layers in order
         for layer in self.layers:
             if layer.visible:
-                # Merge layer params with global kwargs, layer params take precedence
-                render_params = {**kwargs, **layer.params}
-
-                # Extract SVG group attributes (like transform) from render_params
-                group_attrs = {}
-                if "transform" in render_params:
-                    group_attrs["transform"] = render_params.pop("transform")
-
-                context.push_group(layer.name, **group_attrs)
-                layer.pattern.render(context, **render_params)
+                context.push_group(layer.name)
+                # Pass only global context and layer-specific overrides
+                # We explicitly do NOT merge pattern.render_params here
+                layer.pattern.render(context, lighting=lighting, **layer.params)
                 context.pop_group()
 
     def to_geometry(self, canvas: Canvas | None = None) -> Geometry:
