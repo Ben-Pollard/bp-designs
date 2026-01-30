@@ -29,8 +29,8 @@ class Layer:
 class Scene(Pattern):
     """A composite pattern that manages multiple layers and a canvas."""
 
-    def __init__(self, canvas: Canvas):
-        super().__init__(canvas=canvas)
+    def __init__(self, canvas: Canvas, render_params: dict[str, Any] | None = None):
+        super().__init__(canvas=canvas, render_params=render_params or {})
         self.canvas = canvas
         self.layers: list[Layer] = []
 
