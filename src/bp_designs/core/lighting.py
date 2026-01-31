@@ -48,10 +48,18 @@ class DirectionalLighting(LightingModel):
         self.highlight_amount = highlight_amount
         self.shadow_amount = shadow_amount
         self._gradient_cache: dict[str, str] = {}
+        # Unique session ID to prevent ID collisions in multi-scene compositions
+        import uuid
+        self._session_id = str(uuid.uuid4())[:8]
 
     def setup(self, context: RenderingContext):
         """Initialize lighting in the rendering context."""
         self._context = context
+
+    def _add_def(self, element):
+        """Add a definition to the root SVG drawing."""
+        if hasattr(self, "_context"):
+            self._context.dwg.defs.add(element)
 
     def get_fill(self, base_color: Any, geometry_info: dict[str, Any]) -> str:
         """Get fill for a specific geometry.
@@ -105,7 +113,7 @@ class DirectionalLighting(LightingModel):
         # Create a unique ID for this gradient based on color and bias
         # Use 'n' for negative sign in ID
         bias_str = f"{bias:.2f}".replace("-", "n")
-        grad_id = f"branch_grad_{color.to_hex().replace('#', '')}_{bias_str}"
+        grad_id = f"branch_grad_{self._session_id}_{color.to_hex().replace('#', '')}_{bias_str}"
 
         if grad_id not in self._gradient_cache:
             # Create highlight and shadow colors
@@ -134,7 +142,7 @@ class DirectionalLighting(LightingModel):
                 grad.add_stop_color(offset="50%", color=str(color))
                 grad.add_stop_color(offset="100%", color=str(highlight))
 
-            self._context.dwg.defs.add(grad)
+            self._add_def(grad)
             self._gradient_cache[grad_id] = f"url(#{grad_id})"
 
         return self._gradient_cache[grad_id]
@@ -144,7 +152,7 @@ class DirectionalLighting(LightingModel):
         if not hasattr(self, "_context"):
             return str(color)
 
-        grad_id = f"bg_grad_{color.to_hex().replace('#', '')}"
+        grad_id = f"bg_grad_{self._session_id}_{color.to_hex().replace('#', '')}"
 
         if grad_id not in self._gradient_cache:
             # Background fades from a slightly lighter version to the base color
@@ -164,7 +172,7 @@ class DirectionalLighting(LightingModel):
             grad.add_stop_color(offset="0%", color=str(highlight))
             grad.add_stop_color(offset="100%", color=str(color))
 
-            self._context.dwg.defs.add(grad)
+            self._add_def(grad)
             self._gradient_cache[grad_id] = f"url(#{grad_id})"
 
         return self._gradient_cache[grad_id]
@@ -174,13 +182,15 @@ class DirectionalLighting(LightingModel):
         if not hasattr(self, "_context"):
             return str(color)
 
-        grad_id = f"global_grad_{color.to_hex().replace('#', '')}"
+        grad_id = f"global_grad_{self._session_id}_{color.to_hex().replace('#', '')}"
 
         if grad_id not in self._gradient_cache:
             highlight = color.lighten(self.highlight_amount)
             shadow = color.darken(self.shadow_amount)
 
-            # Gradient direction mirrors light direction
+            # Gradient direction mirrors light direction.
+            # We use objectBoundingBox (0.0 to 1.0) to ensure the gradient fills the shape.
+            # We use a full span (0.0 to 1.0) to ensure the transition is visible.
             x1, y1 = 0.5 - self.light_direction[0] * 0.5, 0.5 - self.light_direction[1] * 0.5
             x2, y2 = 0.5 + self.light_direction[0] * 0.5, 0.5 + self.light_direction[1] * 0.5
 
@@ -194,7 +204,7 @@ class DirectionalLighting(LightingModel):
             grad.add_stop_color(offset="50%", color=str(color))
             grad.add_stop_color(offset="100%", color=str(shadow))
 
-            self._context.dwg.defs.add(grad)
+            self._add_def(grad)
             self._gradient_cache[grad_id] = f"url(#{grad_id})"
 
         return self._gradient_cache[grad_id]
@@ -209,7 +219,7 @@ class DirectionalLighting(LightingModel):
         angle = info.get("angle", 0.0)
         # Round angle to limit number of gradients in cache
         angle_key = int(round(angle / 10.0) * 10) % 360
-        grad_id = f"organ_grad_{color.to_hex().replace('#', '')}_{angle_key}"
+        grad_id = f"organ_grad_{self._session_id}_{color.to_hex().replace('#', '')}_{angle_key}"
 
         if grad_id not in self._gradient_cache:
             highlight = color.lighten(self.highlight_amount)
@@ -235,7 +245,7 @@ class DirectionalLighting(LightingModel):
             grad.add_stop_color(offset="0%", color=str(highlight))
             grad.add_stop_color(offset="100%", color=str(color))
 
-            self._context.dwg.defs.add(grad)
+            self._add_def(grad)
             self._gradient_cache[grad_id] = f"url(#{grad_id})"
 
         return self._gradient_cache[grad_id]

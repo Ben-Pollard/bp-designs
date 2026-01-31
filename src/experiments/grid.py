@@ -28,8 +28,8 @@ if __name__ == "__main__":
             np.cos(np.radians(light_angle)),
             np.sin(np.radians(light_angle))
         ]),
-        highlight_amount=0.2,
-        shadow_amount=0.2
+        highlight_amount=0.5,
+        shadow_amount=0.5
     )
     scene = Scene(global_canvas, render_params={"lighting": lighting})
 
@@ -143,7 +143,7 @@ if __name__ == "__main__":
         tree_scene.add_layer(
             f"bg_{i}_{j}",
             rect_gen.generate_pattern(),
-            fill=Color.from_hex(bg_dict[organ.base_color.to_hex().upper()]).with_hsl(s=0.2, lightness=0.9)
+            fill=Color.from_hex(bg_dict[organ.base_color.to_hex().upper()]).with_hsl(s=0.2, lightness=0.5)
         )
 
         # Add tree to local scene

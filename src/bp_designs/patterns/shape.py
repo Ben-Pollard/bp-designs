@@ -211,11 +211,14 @@ class ShapePattern(Pattern):
 
         svg_attrs = style.get_svg_attributes()
 
-        # Draw polygon
         # Apply lighting if available
         fill = style.fill if style.fill is not None else "none"
-        if context.lighting and fill != "none":
-            fill = context.lighting.get_fill(fill, {"type": "global"})
+
+        # Use lighting from context if available, otherwise check kwargs
+        lighting = getattr(context, "lighting", None) or kwargs.get("lighting")
+
+        if lighting and fill != "none":
+            fill = lighting.get_fill(fill, {"type": "global"})
 
         # Draw polygon
         context.add(

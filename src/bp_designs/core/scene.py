@@ -96,7 +96,7 @@ class Scene(Pattern):
             viewBox=f"{xmin} {ymin} {view_width} {view_height}",
         )
 
-        lighting: LightingModel | None = kwargs.get("lighting")
+        lighting: LightingModel | None = kwargs.get("lighting") or self.render_params.get("lighting")
         context = RenderingContext(dwg, lighting=lighting)
         self.render(context, **kwargs)
 

@@ -180,14 +180,6 @@ class NetworkRenderer:
 
         svg_attrs = style.get_svg_attributes()
 
-        fill_override = None
-        if style.shading == "linear" and style.color_strategy == "depth":
-            gradient = context.dwg.linearGradient(id="depth_gradient", x1="0%", y1="0%", x2="0%", y2="100%")
-            gradient.add_stop_color(offset="0%", color=str(style.start_color))
-            gradient.add_stop_color(offset="100%", color=str(style.end_color))
-            context.dwg.defs.add(gradient)
-            fill_override = "url(#depth_gradient)"
-
         id_to_idx = {node_id: i for i, node_id in enumerate(self.network.node_ids)}
 
         # Render branches
@@ -202,14 +194,15 @@ class NetworkRenderer:
                     thickness_mode=style.thickness_mode,
                 )
                 for poly in polygons:
-                    fill_color = (
-                        fill_override
-                        if fill_override
-                        else (all_colors[0] if len(all_colors) > 0 else "black")
-                    )
-                    if context.lighting:
+                    # Use the first node's color as base for the unioned polygon
+                    fill_color = all_colors[0] if len(all_colors) > 0 else "black"
+
+                    # Use lighting from context if available, otherwise check kwargs
+                    lighting = getattr(context, "lighting", None) or kwargs.get("lighting")
+
+                    if lighting:
                         # For unioned polygons, we use a global directional fill
-                        fill_color = context.lighting.get_fill(
+                        fill_color = lighting.get_fill(
                             fill_color, {"type": "global"}
                         )
                     context.add(
