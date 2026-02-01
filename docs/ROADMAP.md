@@ -36,21 +36,27 @@
 ### Phase 1c: Tree Fixes
 - [x] Use thickness strategy
 - [x] Use refinement
-- [ ] Fix output exceeding background size 
+- [x] Fix output exceeding background size 
 
 ### Phase 1d: Trees Experimentation
-- [ ] Generate ideas
+- [x] Generate ideas (See `docs/exploration/space_col_artistic_directions.md`)
+- [ ] Implement "Wild" Space Colonization variants:
+  - [ ] **Living Calligraphy:** Momentum/Inertia and dynamic segment lengths
+  - [ ] **Parasitic Geometry:** Obstacle avoidance and surface clinging
+  - [ ] **Crystalline Growth:** Grid-snapping and directional quantization
+  - [ ] **Temporal Echoes:** Growth ring (isochrone) rendering
+  - [ ] **Neural Mats:** Cross-linking and branch fusion (graph topology)
 - [ ] Non-tree applications
   - [ ] Rivers (noise the growth vector)
-  - [ ] Cracking
+  - [ ] Cracking (stress-based snapping)
   - [ ] Leaf veins
 - [ ] Experiment with size
 - [x] Generate systematic variations:
 - [x] Parallelize experiment runner for faster batch generation
-- [ ] Guided growth (different influence strengths)
+- [ ] Guided growth (Tropism, Vortex fields)
 - [x] Use Gallery tool to batch render variations
 
-### Phase 1c: Tree output
+### Phase 1e: Tree output
 - [ ] For 2d colour printing: an array of trees
 
 

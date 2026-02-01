@@ -11,6 +11,14 @@ from bp_designs.core.directions import DirectionVectors
 from bp_designs.core.generator import Generator
 from bp_designs.core.geometry import Canvas, Point, Polygon
 from bp_designs.core.pattern import Pattern
+from bp_designs.generators.branching.strategies import (
+    AttractionStrategy,
+    DefaultAttraction,
+    DefaultGrowth,
+    DefaultTopology,
+    GrowthStrategy,
+    TopologyStrategy,
+)
 from bp_designs.patterns.network import BranchNetwork
 from bp_designs.patterns.network.refinement import NetworkRefinementStrategy
 
@@ -43,6 +51,9 @@ class SpaceColonization(Generator):
         refinement_strategy: NetworkRefinementStrategy = None,
         organ_template: OrganPattern | None = None,
         organ_distribution: str | Any = "terminal",
+        growth_strategy: GrowthStrategy | None = None,
+        attraction_strategy: AttractionStrategy | None = None,
+        topology_strategy: TopologyStrategy | None = None,
     ):
         """Initialize Space Colonization generator.
 
@@ -57,6 +68,12 @@ class SpaceColonization(Generator):
             segment_length: Length of each growth segment
             boundary_expansion: Buffer distance for organic boundary growth
             max_iterations: Maximum number of growth iterations
+            refinement_strategy: Optional strategy to refine the network
+            organ_template: Optional template for organs
+            organ_distribution: Strategy for organ distribution
+            growth_strategy: Strategy for modifying growth vectors
+            attraction_strategy: Strategy for managing attraction points
+            topology_strategy: Strategy for connecting new nodes
         """
         self.rng = np.random.default_rng(seed)
 
@@ -96,13 +113,17 @@ class SpaceColonization(Generator):
         self.organ_template = organ_template
         self.organ_distribution = organ_distribution
 
+        # Initialize strategies
+        self.growth_strategy = growth_strategy or DefaultGrowth(segment_length=self.segment_length)
+        self.attraction_strategy = attraction_strategy or DefaultAttraction()
+        self.topology_strategy = topology_strategy or DefaultTopology()
+
     def generate_pattern(
         self, **render_params
     ) -> BranchNetwork:
         """Generate branching pattern using stored parameters.
 
         Args:
-            refinement_strategy: Optional strategy to refine the network before organ attachment.
             **render_params: Rendering parameters to store in the resulting Pattern.
 
         Returns:
@@ -114,10 +135,12 @@ class SpaceColonization(Generator):
         initial_timestamp = 0
         network_previous = self._initialize_network(initial_timestamp)
 
-        attractions = self._initialize_attractions(self.num_attractions, self.initial_boundary)
+        attractions = self.attraction_strategy.initialize(
+            self.num_attractions, self.initial_boundary, self.rng
+        )
 
-        for _ in range(self.max_iterations):
-            network, attractions = self._iterate(network_previous, attractions)
+        for i in range(self.max_iterations):
+            network, attractions = self._iterate(network_previous, attractions, timestamp=i + 1)
             if attractions.size == 0:
                 break
             if network.num_nodes == network_previous.num_nodes:
@@ -162,52 +185,6 @@ class SpaceColonization(Generator):
         )
         return network
 
-    def _initialize_attractions(self, num_attractions: int, boundary: Polygon) -> np.ndarray:
-        """Generate attraction points inside boundary polygon.
-
-        Uses rejection sampling: generate points in bounding box,
-        keep only those inside polygon using shapely.
-
-        Args:
-            num_attractions: Number of attraction points to generate
-            boundary: Polygon defining region
-
-        Returns:
-            (N, 2) array of attraction point positions inside boundary
-        """
-        if num_attractions <= 0:
-            return np.array([], dtype=float).reshape(0, 2)
-
-        # Get bounding box for efficient sampling
-        bounds = boundary.bounds()
-        xmin, ymin, xmax, ymax = bounds
-
-        # Create shapely polygon for containment checks
-        shapely_poly = ShapelyPolygon(boundary.coords)
-
-        points = []
-        batch_size = min(num_attractions * 2, 1000)
-
-        # Safety break to avoid infinite loop if boundary is too small
-        max_attempts = 100
-        attempts = 0
-
-        while len(points) < num_attractions and attempts < max_attempts:
-            attempts += 1
-            # Generate candidate points in bounding box
-            x = self.rng.uniform(xmin, xmax, batch_size)
-            y = self.rng.uniform(ymin, ymax, batch_size)
-            candidates = np.column_stack([x, y])  # (batch_size, 2)
-
-            # Vectorized containment check using shapely.contains
-            import shapely
-
-            candidate_points = shapely.points(candidates)
-            mask = shapely.contains(shapely_poly, candidate_points)
-            valid_points = candidates[mask]
-            points.extend(valid_points)
-
-        return np.array(points[:num_attractions])
 
     def _compute_current_boundary(self, network: BranchNetwork) -> Polygon:
         """Compute organic boundary based on current network extent.
@@ -344,15 +321,21 @@ class SpaceColonization(Generator):
         self,
         network: BranchNetwork,
         attractions: np.ndarray,
+        timestamp: int,
     ) -> tuple[BranchNetwork, np.ndarray]:
         """Perform one iteration of growth."""
-        # Compute current boundary based on network extent
+        # 1. Update attraction points (e.g., movement, consumption)
+        attractions = self.attraction_strategy.update(attractions, network, self.rng)
+
+        # 2. Compute current boundary based on network extent
         current_boundary = self._compute_current_boundary(network)
 
-        # Place new attractions within current boundary
-        new_attractions = self._initialize_attractions(self.num_attractions, current_boundary)
+        # 3. Place new attractions within current boundary
+        new_attractions = self.attraction_strategy.initialize(
+            self.num_attractions, current_boundary, self.rng
+        )
 
-        # Check neighbourhoods for inclusion of previously placed attractions
+        # 4. Check neighbourhoods for inclusion of previously placed attractions
         if attractions.size > 0:
             try:
                 from scipy.spatial import cKDTree
@@ -369,7 +352,7 @@ class SpaceColonization(Generator):
         else:
             attractions = new_attractions
 
-        # Remove colonized attractions (those within kill distance of nodes)
+        # 5. Remove colonized attractions (those within kill distance of nodes)
         try:
             from scipy.spatial import cKDTree
 
@@ -384,37 +367,27 @@ class SpaceColonization(Generator):
 
         attractions = attractions[kill_mask, :]
 
-        # Calculate the attraction data using KDTree
+        # 6. Calculate the attraction data using KDTree
         closest_node_indices, dists, vectors = self._attraction_vectors(network, attractions)
 
         if dists.size == 0:
             return network, attractions
 
-        # Filter down to just the growing nodes (those that are closest to at least one attraction point)
+        # 7. Filter down to just the growing nodes
         growth_node_indices = np.unique(closest_node_indices)
-        growing_nodes = network.get_nodes(growth_node_indices)
 
-        # Calculate growth vectors
-        growth_vectors = self._growth_vectors(closest_node_indices, dists, vectors, network.num_nodes)
+        # 8. Calculate growth vectors
+        growth_vectors_obj = self._growth_vectors(closest_node_indices, dists, vectors, network.num_nodes)
+        raw_growth_vectors = growth_vectors_obj.vectors[growth_node_indices]
 
-        # We only care about growth vectors for the growing nodes
-        active_growth_vectors = growth_vectors.vectors[growth_node_indices]
+        # 9. Refine growth vectors (e.g., momentum, grid-snapping)
+        refined_growth_vectors = self.growth_strategy.refine_vectors(raw_growth_vectors, network)
 
-        # Create updated network with new nodes
-        new_positions = growing_nodes.positions + active_growth_vectors
+        # 10. Create updated network with new nodes using TopologyStrategy
+        new_positions = network.positions[growth_node_indices] + refined_growth_vectors
 
-        num_new_nodes = new_positions.shape[0]
-        next_node_id = network.node_ids.max() + 1
-        new_node_ids = np.arange(next_node_id, next_node_id + num_new_nodes)
-        new_timestamps = np.full(num_new_nodes, network.timestamps.max() + 1, dtype=np.int16)
-
-        updated_network = BranchNetwork(
-            node_ids=np.hstack([network.node_ids, new_node_ids]),
-            positions=np.vstack([network.positions, new_positions]),
-            parents=np.hstack([network.parents, growing_nodes.node_ids]),
-            timestamps=np.hstack([network.timestamps, new_timestamps]),
-            canvas=network.canvas,
-            pattern_bounds=network.pattern_bounds,
+        updated_network = self.topology_strategy.extend(
+            network, new_positions, growth_node_indices, timestamp
         )
 
         return updated_network, attractions

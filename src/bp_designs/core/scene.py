@@ -75,16 +75,11 @@ class Scene(Pattern):
         self,
         width: str | float = "100%",
         height: str | float = "100%",
-        padding: float = 20,
         pretty: bool = True,
         **kwargs,
     ) -> str:
         """Render scene to a standalone SVG string."""
         xmin, ymin, xmax, ymax = self.canvas.bounds()
-        xmin -= padding
-        ymin -= padding
-        xmax += padding
-        ymax += padding
         view_width = xmax - xmin
         view_height = ymax - ymin
 

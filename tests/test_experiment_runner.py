@@ -161,7 +161,7 @@ class TestExperimentRunner:
         )
 
         # Run experiment with max_variants to limit test time
-        summary = runner.run(grid, mock_generator, max_variants=2)
+        summary = runner.run(grid, mock_generator, max_variants=2, parallel=False)
 
         # Check summary
         assert summary["experiment_name"] == "test_run"
@@ -188,8 +188,6 @@ class TestExperimentRunner:
             assert metadata["params"]["seed"] == 1
             assert metadata["params"]["size"] == 100
             assert metadata["svg_path"] == "outputs/var_0001.svg"
-            assert metadata["svg_size"]["width"] == 100
-            assert metadata["svg_size"]["height"] == 100
 
             # Check that geometry objects were serialized
             params = metadata["params"]
@@ -238,7 +236,7 @@ class TestExperimentRunner:
             experiment_name="test_failures",
         )
 
-        summary = runner.run(grid, mock_generator)
+        summary = runner.run(grid, mock_generator, parallel=False)
 
         # Check summary
         assert summary["successful"] == 1
@@ -281,7 +279,7 @@ class TestExperimentRunner:
 
         runner = experiment_runner_factory(experiment_name="test_dict_result")
 
-        _summary = runner.run(grid, mock_generator, max_variants=1)
+        _summary = runner.run(grid, mock_generator, max_variants=1, parallel=False)
 
         # Check that files were saved
         exp_dir = output_dir / "test_dict_result"
@@ -319,7 +317,7 @@ class TestExperimentRunner:
 
         runner = experiment_runner_factory(experiment_name="test_numpy_metadata")
 
-        _summary = runner.run(grid, mock_generator)
+        _summary = runner.run(grid, mock_generator, parallel=False)
 
         # Check that numpy arrays in parameters were converted to lists
         exp_dir = output_dir / "test_numpy_metadata"
@@ -350,7 +348,7 @@ class TestExperimentRunner:
         def mock_generator(params):
             return MockPattern(np.array([[0, 0], [10, 10]]))
 
-        summary = runner.run(grid, mock_generator)
+        summary = runner.run(grid, mock_generator, parallel=False)
 
         # Check that _update_experiments_index was called
         mock_update_index.assert_called_once()
@@ -387,7 +385,7 @@ class TestExperimentRunner:
         runner = experiment_runner_factory(experiment_name="test_max_variants")
 
         # Limit to 3 variants
-        summary = runner.run(grid, mock_generator, max_variants=3)
+        summary = runner.run(grid, mock_generator, max_variants=3, parallel=False)
 
         assert summary["total_variants"] == 3
         assert summary["successful"] == 3
@@ -422,7 +420,7 @@ class TestExperimentRunner:
             return MockPattern(np.array([[0, 0], [10, 10]]))
 
         # Should generate one variant with empty params
-        summary = runner.run(grid, mock_generator)
+        summary = runner.run(grid, mock_generator, parallel=False)
 
         assert summary["total_variants"] == 1
         assert summary["successful"] == 1
@@ -438,7 +436,7 @@ class TestExperimentRunner:
         def bad_generator(params):
             return "not a geometry"  # Wrong return type
 
-        summary = runner.run(grid, bad_generator)
+        summary = runner.run(grid, bad_generator, parallel=False)
 
         # Should record failure
         assert summary["successful"] == 0

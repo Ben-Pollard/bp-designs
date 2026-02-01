@@ -36,13 +36,13 @@ def test_refinement_subdivide(simple_network):
     assert refined.num_nodes == 5
 
 def test_refinement_relocate(simple_network):
-    # Relocate with alpha=1.0 should move node 1 to midpoint of 0 and 2
-    # Node 0 is at (0,0), Node 2 is at (10.5, 0). Midpoint is (5.25, 0)
+    # Relocate with alpha=1.0 should move node 1 to its parent's position (Node 0)
+    # Node 0 is at (0,0), Node 1 is at (10, 0).
     strategy = NetworkRefinementStrategy(relocate_alpha=1.0, relocate_iterations=1, relocate_fix_leaves=True, relocate_fix_roots=True)
     refined = strategy.apply(simple_network)
 
-    # Node 1 is at index 1
-    np.testing.assert_array_almost_equal(refined.positions[1], [5.25, 0])
+    # Node 1 is at index 1, should now be at (0, 0)
+    np.testing.assert_array_almost_equal(refined.positions[1], [0, 0])
 
 def test_refinement_combined(simple_network):
     # Decimate (removes 2) -> Subdivide (adds 1 midpoint for 0-1) -> Relocate

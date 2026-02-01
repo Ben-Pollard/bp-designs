@@ -7,6 +7,7 @@ import numpy as np
 from bp_designs.core.color import Color
 from bp_designs.core.geometry import Canvas
 from bp_designs.core.lighting import DirectionalLighting
+from bp_designs.core.scene import Scene
 from bp_designs.experiment.params import ParameterSpace, split_params
 from bp_designs.experiment.runner import ExperimentRunner
 from bp_designs.generators.branching.space_colonization import SpaceColonization
@@ -24,9 +25,21 @@ def generate_pattern(params: dict):
     # Create generator with structural params
     gen = SpaceColonization(**network_params)
 
-
     # Generate pattern with refinement and rendering params
-    return gen.generate_pattern(**render_params)
+    pattern = gen.generate_pattern(**render_params)
+
+    # Wrap in a scene to handle lighting and background correctly
+    canvas = network_params.get("canvas")
+    lighting = render_params.pop("lighting", None)
+    bg_color = render_params.pop("background_color", None)
+
+    if canvas:
+        canvas.background_color = bg_color
+        scene = Scene(canvas, render_params={"lighting": lighting})
+        scene.add_layer("tree", pattern, **render_params)
+        return scene
+
+    return pattern
 
 
 def main():
@@ -68,13 +81,13 @@ def main():
         center_color=c,
         jitter=0.1,
         overlap=1.2
-    ) for b,c in [("#F4BBD3","#FEFA86"), ("#FEFA86", "#F4BBD3")]]
+    ) for b,c in [("#A63A50","#FFF05A"), ("#FFF05A", "#A63A50")]]
 
     bg_dict = {
-        "#F4BBD3": "#FEFA86",
-        "#FEFA86": "#F4BBD3",
+        "#A63A50": "#FFF05A",
+        "#FFF05A": "#A63A50",
         "#2D936C": "#F08700",
-        "#F08700": "#F4BBD3"
+        "#F08700": "#A63A50"
     }
 
 

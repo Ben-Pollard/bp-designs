@@ -20,7 +20,7 @@ if __name__ == "__main__":
     """Run multi-tree composition."""
 
     # Global canvas for the whole composition
-    global_canvas = Canvas.from_size(2000)
+
 
     light_angle = 45
     lighting = DirectionalLighting(
@@ -28,19 +28,28 @@ if __name__ == "__main__":
             np.cos(np.radians(light_angle)),
             np.sin(np.radians(light_angle))
         ]),
-        highlight_amount=0.5,
-        shadow_amount=0.5
+        highlight_amount=0.2,
+        shadow_amount=0.05
     )
+
+    global_canvas = Canvas.from_width_height(width=2100, height=2970)
     scene = Scene(global_canvas, render_params={"lighting": lighting})
+
+    scene.add_layer(
+        "bg_global",
+        Rectangle.from_canvas(global_canvas).generate_pattern(),
+        fill=Color.from_hex("#ffffff")
+    )
+
 
     # We'll create a 2x2 grid of trees
 
 
     bg_dict = {
-        "#F4BBD3": "#FEFA86",
-        "#FEFA86": "#F4BBD3",
-        "#2D936C": "#F08700",
-        "#F08700": "#F4BBD3"
+        "#E359D1": "#075F3F",
+        "#C061FB": "#F49F0A",
+        "#075F3F": "#E359D1",
+        "#F49F0A": "#C061FB"
     }
 
     leaf_gen = LeafGenerator()
@@ -49,22 +58,22 @@ if __name__ == "__main__":
     unique_params = [
         {
             'cell': (0, 0),
-            'organ': leaf_gen.generate_pattern(base_color=Color.from_hex("#2D936C"), scale=70.0),
-        },
-        {
-            'cell': (1, 0),
-            'organ': leaf_gen.generate_pattern(base_color=Color.from_hex("#F08700"), scale=70.0),
+            'organ': leaf_gen.generate_pattern(base_color=Color.from_hex("#075F3F"), scale=70.0),
         },
         {
             'cell': (1, 1),
+            'organ': leaf_gen.generate_pattern(base_color=Color.from_hex("#F49F0A"), scale=70.0),
+        },
+        {
+            'cell': (1, 0),
             'organ': blossom_gen.generate_pattern(
-                base_color=Color.from_hex("#F4BBD3"),
-                scale=4.0,
+                base_color=Color.from_hex("#E359D1"),
+                scale=5.0,
                 num_rings=2,
                 inner_radius=0.0,
                 ring_spacing=1.0,
                 petal_shape="teardrop",
-                center_color="#FEFA86",
+                center_color="#F49F0A",
                 jitter=0.1,
                 overlap=1.2
             ),
@@ -72,13 +81,13 @@ if __name__ == "__main__":
         {
             'cell': (0, 1),
             'organ': blossom_gen.generate_pattern(
-                base_color=Color.from_hex("#FEFA86"),
-                scale=4.0,
+                base_color=Color.from_hex("#C061FB"),
+                scale=5.0,
                 num_rings=2,
                 inner_radius=0.0,
                 ring_spacing=1.0,
                 petal_shape="teardrop",
-                center_color="#F4BBD3",
+                center_color="#F49F0A",
                 jitter=0.1,
                 overlap=1.2
             ),
@@ -91,13 +100,18 @@ if __name__ == "__main__":
 
         # Local scene using sub_canvas for placement
         cell_size = 1000
+        num_cols, num_rows = 2, 2
+        h_gap = (global_canvas.width - num_cols * cell_size) / (num_cols + 1)
+        v_gap = h_gap  # Vertical spacing same as horizontal
+        v_offset = (global_canvas.height - (num_rows * cell_size + (num_rows - 1) * v_gap)) / 2
+
         local_canvas = global_canvas.sub_canvas(
-            x=j * cell_size,
-            y=i * cell_size,
+            x=h_gap + j * (cell_size + h_gap),
+            y=v_offset + i * (cell_size + v_gap),
             width=cell_size,
             height=cell_size
         )
-        tree_scene = Scene(local_canvas)
+
 
         # Define boundaries for this local canvas
         oval = Oval.from_bbox([0.1, 0.1, 0.9, 0.8], canvas=local_canvas)
@@ -115,9 +129,9 @@ if __name__ == "__main__":
             max_iterations=300,
             seed=random.randint(0, 100),
             refinement_strategy=NetworkRefinementStrategy(
-                decimate_min_distance=random.randint(5, 15),
+                decimate_min_distance=random.randint(5, 10),
                 subdivide=True,
-                relocate_alpha=0.5,
+                relocate_alpha=0.2,
                 relocate_iterations=3
             ),
             organ_template=organ,
@@ -139,11 +153,14 @@ if __name__ == "__main__":
         )
         tree = gen.generate_pattern(**network_style.model_dump())
 
+
+        tree_scene = Scene(local_canvas)
+
         rect_gen = Rectangle.from_canvas(local_canvas)
         tree_scene.add_layer(
             f"bg_{i}_{j}",
             rect_gen.generate_pattern(),
-            fill=Color.from_hex(bg_dict[organ.base_color.to_hex().upper()]).with_hsl(s=0.2, lightness=0.5)
+            fill=Color.from_hex(bg_dict[organ.base_color.to_hex().upper()]).with_hsl(s=0.2, lightness=0.9)
         )
 
         # Add tree to local scene
@@ -153,8 +170,8 @@ if __name__ == "__main__":
         tree_scene.add_layer(
             f"border_{i}_{j}",
             rect_gen.generate_pattern(),
-            stroke_color="#333333",
-            stroke_width=10,
+            stroke_color="#1B1B1B",
+            stroke_width=cell_size / 50,
             fill="none"
         )
 
