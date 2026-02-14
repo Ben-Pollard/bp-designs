@@ -8,12 +8,83 @@ Generative system for creating natural, algorithmic patterns for physical fabric
 
 ---
 
+## What is it?
+
+Beyond just "generating patterns," this project focuses on two core pillars:
+
+### 1. Deep Composability
+Patterns are not just static images; they are semantic building blocks.
+- **Functional Pipelines:** A pattern produced by one generator (e.g., a Voronoi cell) can serve as the boundary or guidance field for another (e.g., a branching tree).
+- **Spatial Nesting:** Using `sub_canvas`, patterns can be recursively nested and transformed within a global coordinate system.
+- **Semantic Preservation:** We maintain the topology (e.g., parent-child relationships) until export, allowing for "smart" rendering like hierarchy-aware tapering.
+
+### 2. Systematic Experimentation
+We replace "random tweaking" with a rigorous experimentation framework.
+- **Parameter Grids:** Define a search space and let the `ExperimentRunner` explore every combination.
+- **Data-Driven Gallery:** Every experiment variant is saved with its metadata, allowing for visual comparison and discovery in the built-in gallery.
+- **Deterministic Results:** Every pattern is seed-based, ensuring that "happy accidents" are always reproducible.
+
+---
+
 ## Supported Algorithms
 
 - **Branching (Space Colonization):** Organic, tree-like growth patterns with custom growth strategies and organic rendering.
 - **Cellular (Voronoi):** Natural tiling and cellular structures (Phase 2: refinement in progress).
 - **Organs (Procedural Blossoms):** Multi-ring, organic petal shapes for decorative elements.
 - **Primitives:** 2D shapes (Ovals, Regular Polygons) as building blocks.
+
+---
+
+### 1.1 The Design Lifecycle
+The overall flow from experiment definition to visual discovery in the gallery follows a systematic pipeline:
+
+```mermaid
+graph TD
+    subgraph Experiment
+        Exp
+        Grid
+    end
+    subgraph Review
+        Met
+        Out
+        Gal
+    end
+    subgraph Composition
+        Gen
+        Pat
+    end
+    Exp[Experiment Script] --> Grid[Parameter Grid]
+    Grid --> Gen[Generators]
+    Grid --> Met[Metadata]
+    Gen --> Pat[Patterns]
+    Pat -- "Input to" --> Gen
+    Composition --> Out[Image]
+    Met --> Gal
+    Out --> Gal[Web Gallery]
+```
+
+### 1.2 Core API
+
+```mermaid
+graph TD
+    subgraph Algorithm Layer
+        G[Generator]
+    end
+    subgraph Semantic Layer
+        P[Pattern]
+    end
+    subgraph Interchange Layer
+        Ge[Geometry]
+    end
+    subgraph Output
+        SVG[SVG Output]
+    end
+
+    G -- produces --> P
+    P -- converts to --> Ge
+    Ge -- renders to --> SVG
+    P -- guides --> G
+```
 
 ---
 
