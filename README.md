@@ -1,5 +1,7 @@
 # BP Designs - Algorithmic Pattern Generation
 
+![4 Trees Composition](output/composition/4trees.jpg)
+
 Generative system for creating natural, algorithmic patterns for physical fabrication.
 
 **Core Philosophy:** Deterministic algorithms → organic emergence → physical craft
@@ -79,49 +81,6 @@ Physical manufacturing constraints:
 - Embossable depth and detail
 
 **See:** `docs/design_goals.md` for full philosophy
-
----
-
-
-## Working with Claude Code (AI Agent)
-
-This project is designed for AI-assisted development. Claude reads project docs to understand context and help implement patterns.
-
-### Session Startup
-When starting a session, Claude will:
-1. Read `docs/ROADMAP.md` for current priorities
-2. Check `docs/exploration/*.md` for recent findings
-3. Consult `docs/design_goals.md` for philosophy
-4. Reference `docs/api.md` when writing pattern code
-
-### Key Docs for Claude
-- `CLAUDE.md` - Instructions for AI assistant (workflow, principles, examples)
-- `ROADMAP.md` - Current phase, decisions, next steps
-- `exploration/LEARNINGS.md` - Proven patterns and parameter ranges
-- `ARCHITECTURE_GALLERY.md` - How experiments and gallery work
-
-### Development Workflow
-1. Explore in Jupyter notebooks (interactive prototyping)
-2. Run experiments (systematic parameter sweeps)
-3. View in gallery (compare variations)
-4. Extract to modules (when stable)
-5. Document findings (learnings, exploration logs)
-
-**Philosophy:** Iteration and curation. Visual results matter more than code elegance (though both matter).
-
----
-
-## Resources
-
-### Documentation
-- `docs/design_goals.md` - Aesthetic philosophy and constraints
-- `docs/api.md` - Pattern generator API reference
-- `docs/resources/algorithms.md` - Algorithm overviews
-- `docs/resources/RESOURCES.md` - External papers and tools
-
-### Examples
-- `scripts/experiments/` - Example experiment scripts
-- `output/experiments/` - Generated results (after running experiments)
 
 ---
 
