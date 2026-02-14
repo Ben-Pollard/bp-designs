@@ -1,6 +1,6 @@
 # BP Designs - Algorithmic Pattern Generation
 
-![4 Trees Composition](output/composition/4trees.jpg)
+![4 Trees Composition](assets/4trees.jpg)
 
 Generative system for creating natural, algorithmic patterns for physical fabrication.
 
