@@ -8,6 +8,15 @@ Generative system for creating natural, algorithmic patterns for physical fabric
 
 ---
 
+## Supported Algorithms
+
+- **Branching (Space Colonization):** Organic, tree-like growth patterns with custom growth strategies and organic rendering.
+- **Cellular (Voronoi):** Natural tiling and cellular structures (Phase 2: refinement in progress).
+- **Organs (Procedural Blossoms):** Multi-ring, organic petal shapes for decorative elements.
+- **Primitives:** 2D shapes (Ovals, Regular Polygons) as building blocks.
+
+---
+
 ## Quick Start
 
 ### Prerequisites
