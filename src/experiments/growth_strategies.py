@@ -1,4 +1,4 @@
-"""Experiment demonstrating Crystalline (grid-snapped) Space Colonization."""
+"""Experiment demonstrating various Space Colonization growth strategies."""
 
 
 from bp_designs.core.geometry import Canvas
@@ -6,7 +6,7 @@ from bp_designs.core.scene import Scene
 from bp_designs.experiment.params import ParameterSpace, split_params
 from bp_designs.experiment.runner import ExperimentRunner
 from bp_designs.generators.branching.space_colonization import SpaceColonization
-from bp_designs.generators.branching.strategies import GridSnappedGrowth
+from bp_designs.generators.branching.strategies import DefaultGrowth, GridSnappedGrowth, MomentumGrowth
 from bp_designs.generators.primitives.two_d import Oval
 from bp_designs.patterns.shape import PointPattern
 
@@ -36,7 +36,7 @@ def generate_pattern(params: dict):
 
 
 def main():
-    """Run crystalline growth exploration."""
+    """Run growth strategies exploration."""
     ref_canvas = Canvas.from_size(1000)
 
     # Simple oval boundary
@@ -46,19 +46,20 @@ def main():
     root_pos = PointPattern(0.5, 1.0, is_relative=True, name="Bottom Center")
 
     space = ParameterSpace(
-        name="crystalline_growth",
+        name="growth_strategies",
         specs={
             # Network structural parameters
-            "network.num_attractions": [500],
+            "network.num_attractions": [20],
             "network.segment_length": [10.0],
             "network.kill_distance": [8.0],
-            "network.seed": [42, 123],
+            "network.seed": [42],
             "network.canvas": [ref_canvas],
             "network.initial_boundary": [boundary],
             "network.final_boundary": [boundary],
             "network.root_position": [root_pos],
             # Strategy parameters
-            "strategy.angles": [4, 8],
+            "strategy.type": ["default", "momentum", "grid_4", "grid_8"],
+            "strategy.momentum_value": [0.1, 0.3, 0.5],
             # Rendering parameters
             "render.render_mode": "polygon",
             "render.thickness": "descendant",
@@ -70,9 +71,14 @@ def main():
             "render.background_color": "#f8f8f8",
         },
         derived={
-            "network.growth_strategy": lambda p: GridSnappedGrowth(
-                segment_length=p["network.segment_length"],
-                angles=p["strategy.angles"]
+            "network.growth_strategy": lambda p: (
+                MomentumGrowth(segment_length=p["network.segment_length"], momentum=p["strategy.momentum_value"])
+                if p["strategy.type"] == "momentum"
+                else GridSnappedGrowth(segment_length=p["network.segment_length"], angles=4)
+                if p["strategy.type"] == "grid_4"
+                else GridSnappedGrowth(segment_length=p["network.segment_length"], angles=8)
+                if p["strategy.type"] == "grid_8"
+                else DefaultGrowth(segment_length=p["network.segment_length"])
             )
         }
     )
@@ -80,12 +86,12 @@ def main():
     grid = space.to_grid()
 
     runner = ExperimentRunner(
-        experiment_name="crystalline_growth",
+        experiment_name="growth_strategies",
         svg_width=1000,
         svg_height=1000,
     )
 
-    runner.run(grid=grid, generator_fn=generate_pattern, parallel=False)
+    runner.run(grid=grid, generator_fn=generate_pattern, parallel=True)
 
 
 if __name__ == "__main__":

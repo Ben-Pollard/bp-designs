@@ -32,7 +32,7 @@ poetry run ruff check
 ### 1. Run an Experiment
 ```bash
 # Generate parameter variations
-poetry run python scripts/experiments/space_colonization_basic.py
+poetry run python src/experiments/regular_polygon_basic.py
 
 # Output: output/experiments/[experiment_name]/
 ```

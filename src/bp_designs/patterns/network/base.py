@@ -35,6 +35,7 @@ class BranchNetwork(Pattern):
     positions: np.ndarray = field(default_factory=lambda: np.array([], dtype=float).reshape(0, 2))
     parents: np.ndarray = field(default_factory=lambda: np.array([], dtype=np.int16))
     timestamps: np.ndarray = field(default_factory=lambda: np.array([], dtype=np.int16))
+    velocities: np.ndarray | None = None  # (N, 2) - Optional stored growth vectors
     pattern_bounds: tuple[float, float, float, float] | None = None  # (xmin, ymin, xmax, ymax)
     thickness: np.ndarray | None = None  # (N,) - Optional stored thickness values
     colors: np.ndarray | None = None  # (N,) - Optional stored color values (hex strings)
@@ -48,6 +49,8 @@ class BranchNetwork(Pattern):
         assert self.parents.shape == (n,), f"parents must be ({n},), got {self.parents.shape}"
         assert self.timestamps.shape == (n,), f"timestamps must be ({n},), got {self.timestamps.shape}"
         assert self.positions.shape == (n, 2), f"positions must be ({n}, 2), got {self.positions.shape}"
+        if self.velocities is not None:
+            assert self.velocities.shape == (n, 2), f"velocities must be ({n}, 2), got {self.velocities.shape}"
         if self.thickness is not None:
             assert self.thickness.shape == (n,), f"thickness must be ({n},), got {self.thickness.shape}"
 
@@ -177,6 +180,7 @@ class BranchNetwork(Pattern):
             pattern_bounds=self.pattern_bounds,
             organ_template=self.organ_template,
             organ_distribution=self.organ_distribution,
+            velocities=self.velocities[selection] if self.velocities is not None else None,
         )
 
     # ============================================================================
@@ -349,6 +353,7 @@ class BranchNetwork(Pattern):
             and np.array_equal(self.positions, other.positions)
             and np.array_equal(self.parents, other.parents)
             and np.array_equal(self.timestamps, other.timestamps)
+            and np.array_equal(self.velocities, other.velocities)
         )
 
     def __hash__(self) -> int:

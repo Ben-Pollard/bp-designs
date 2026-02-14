@@ -91,7 +91,6 @@ class NetworkRenderer:
     ) -> list[Polygon]:
         """Convert network to a single unioned polygon skin."""
         from shapely.geometry import Point as ShapelyPoint
-        from shapely.ops import unary_union
 
         strategy = BranchThicknessStrategy.from_name(
             thickness,
@@ -102,24 +101,33 @@ class NetworkRenderer:
         )
         all_thickness = strategy.compute_thickness(self.network)
 
-        shapes = []
+        import shapely
+
+        # 1. Pre-calculate all node circles
+        node_circles = []
+        for i in range(len(self.network.node_ids)):
+            pos = self.network.positions[i]
+            r = all_thickness[i] / 2.0
+            node_circles.append(ShapelyPoint(pos).buffer(r))
+
+        # 2. Create envelopes for segments
+        shapes = list(node_circles)
         id_to_idx = {node_id: i for i, node_id in enumerate(self.network.node_ids)}
         for i in range(len(self.network.node_ids)):
             parent_id = self.network.parents[i]
-            pos = self.network.positions[i]
-            r = all_thickness[i] / 2.0
-            shapes.append(ShapelyPoint(pos).buffer(r))
             if parent_id == -1 or parent_id not in id_to_idx:
                 continue
+
             parent_idx = id_to_idx[parent_id]
-            parent_pos = self.network.positions[parent_idx]
-            parent_r = all_thickness[parent_idx] / 2.0
-            c1 = ShapelyPoint(pos).buffer(r)
-            c2 = ShapelyPoint(parent_pos).buffer(parent_r)
-            envelope = unary_union([c1, c2]).convex_hull
+            # The convex hull of two circles is the trapezoidal envelope connecting them.
+            # Using GeometryCollection avoids the expensive unary_union inside the loop.
+            envelope = shapely.convex_hull(
+                shapely.GeometryCollection([node_circles[i], node_circles[parent_idx]])
+            )
             shapes.append(envelope)
 
-        combined = unary_union(shapes)
+        # 3. Perform a single union of all shapes at the end
+        combined = shapely.union_all(shapes)
         polygons = []
         if combined.is_empty:
             return []

@@ -139,11 +139,16 @@ class SpaceColonization(Generator):
             self.num_attractions, self.initial_boundary, self.rng
         )
 
+        # Heuristic: Cap node count at canvas area (width * height)
+        max_nodes = self.canvas.width * self.canvas.height
+
         for i in range(self.max_iterations):
             network, attractions = self._iterate(network_previous, attractions, timestamp=i + 1)
             if attractions.size == 0:
                 break
             if network.num_nodes == network_previous.num_nodes:
+                break
+            if network.num_nodes >= max_nodes:
                 break
             network_previous = network
 
@@ -180,6 +185,7 @@ class SpaceColonization(Generator):
             positions=self.root_position_array.reshape(1, 2),  # (N,2) - root position as array
             parents=np.array([-1], dtype=np.int16),  # (N,) - root has no parent
             timestamps=np.array([timestamp], dtype=np.int16),  # (N,) - root timestamp
+            velocities=np.array([[0.0, -1.0]], dtype=float),  # Initial upward velocity
             canvas=self.canvas,
             pattern_bounds=self.canvas.bounds(),
         )
@@ -378,16 +384,17 @@ class SpaceColonization(Generator):
 
         # 8. Calculate growth vectors
         growth_vectors_obj = self._growth_vectors(closest_node_indices, dists, vectors, network.num_nodes)
-        raw_growth_vectors = growth_vectors_obj.vectors[growth_node_indices]
 
         # 9. Refine growth vectors (e.g., momentum, grid-snapping)
-        refined_growth_vectors = self.growth_strategy.refine_vectors(raw_growth_vectors, network)
+        refined_growth_vectors = self.growth_strategy.refine_vectors(
+            growth_vectors_obj, network, growth_node_indices
+        )
 
         # 10. Create updated network with new nodes using TopologyStrategy
         new_positions = network.positions[growth_node_indices] + refined_growth_vectors
 
         updated_network = self.topology_strategy.extend(
-            network, new_positions, growth_node_indices, timestamp
+            network, new_positions, growth_node_indices, timestamp, velocities=refined_growth_vectors
         )
 
         return updated_network, attractions

@@ -40,3 +40,7 @@ output/
 
 *.svg
 /gallery/experiments.json
+
+.roo/
+
+.roomodes
