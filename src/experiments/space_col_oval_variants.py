@@ -13,9 +13,22 @@ from bp_designs.patterns.shape import PointPattern
 
 def generate_pattern(params: dict):
     """Generate pattern from parameters."""
-    gen = SpaceColonization(**params)
+    # Separate structural and rendering parameters
+    # Since they are not namespaced in this experiment, we manually split them
+    structural_keys = {
+        "canvas", "root_position", "initial_boundary", "final_boundary",
+        "seed", "num_attractions", "kill_distance", "segment_length",
+        "boundary_expansion", "max_iterations", "refinement_strategy",
+        "organ_template", "organ_distribution", "growth_strategy",
+        "attraction_strategy", "topology_strategy"
+    }
+
+    network_params = {k: v for k, v in params.items() if k in structural_keys}
+    render_params = {k: v for k, v in params.items() if k not in structural_keys}
+
+    gen = SpaceColonization(**network_params)
     # Generate pattern using stored parameters
-    network = gen.generate_pattern()
+    network = gen.generate_pattern(**render_params)
     return network
 
 
@@ -107,7 +120,10 @@ def main():
     sampled_grid = ParameterGrid(
         space_name=f"{space.name}_sampled",
         param_names=full_grid.param_names,
+        varied_params=full_grid.varied_params,
+        fixed_params=full_grid.fixed_params,
         combinations=[full_grid[i] for i in sampled_indices],
+        derived_param_names=full_grid.derived_param_names,
     )
 
     print(f"Sampled grid size: {len(sampled_grid)} combinations")

@@ -44,8 +44,9 @@ def generate_pattern(params: dict):
                 for i, obs in enumerate(strategy.shapely_obstacles):
                     # Convert shapely back to our Polygon for rendering
                     from bp_designs.core.geometry import Polygon
+                    from bp_designs.patterns.shape import ShapePattern
                     poly = Polygon(coords=np.array(obs.exterior.coords))
-                    scene.add_layer(f"obstacle_{i}", poly.generate_pattern(), fill="#e0e0e0", stroke_color="#999999")
+                    scene.add_layer(f"obstacle_{i}", ShapePattern(poly), fill="#e0e0e0", stroke_color="#999999")
 
         scene.add_layer("tree", pattern, **render_params)
         return scene
@@ -62,8 +63,8 @@ def main():
     boundary = oval.generate_pattern()
 
     # Create some obstacles
-    obs1 = Oval.from_bbox([0.3, 0.3, 0.5, 0.5], canvas=ref_canvas, name="Obstacle 1").generate_pattern().polygon
-    obs2 = Rectangle(bbox=(0.6, 0.2, 0.8, 0.4), canvas=ref_canvas, name="Obstacle 2").generate_pattern().polygon
+    obs1 = Oval.from_bbox([0.3, 0.3, 0.5, 0.5], canvas=ref_canvas, name="Obstacle 1").generate_pattern()
+    obs2 = Rectangle(bbox=(0.6, 0.2, 0.8, 0.4), canvas=ref_canvas, name="Obstacle 2").generate_pattern()
     obstacles = [obs1, obs2]
 
     root_pos = PointPattern(0.5, 0.95, is_relative=True, name="Bottom Center")
@@ -94,7 +95,10 @@ def main():
         },
         derived={
             "network.growth_strategy": lambda p: (
-                ObstacleAvoidanceGrowth(obstacles=obstacles, segment_length=p["network.segment_length"])
+                ObstacleAvoidanceGrowth(
+                    obstacles=[o.to_geometry(ref_canvas) for o in obstacles],
+                    segment_length=p["network.segment_length"]
+                )
                 if p["strategy.mode"] in ["avoidance", "hybrid"]
                 else DefaultGrowth(segment_length=p["network.segment_length"])
             ),

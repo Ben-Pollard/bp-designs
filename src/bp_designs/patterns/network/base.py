@@ -256,6 +256,7 @@ class BranchNetwork(Pattern):
             timestamps=np.concatenate([self.timestamps, new_timestamps]),
             thickness=None,
             colors=None,
+            velocities=None,
         )
 
     def decimate(self, min_distance: float = 1.0) -> BranchNetwork:
@@ -318,6 +319,7 @@ class BranchNetwork(Pattern):
             timestamps=self.timestamps[keep_mask],
             thickness=None,
             colors=None,
+            velocities=self.velocities[keep_mask] if self.velocities is not None else None,
             organs=new_organs,
         )
 

@@ -5,10 +5,11 @@ Explores pattern diversity across different random seeds with fixed parameters.
 
 import numpy as np
 
-from bp_designs.core.geometry import Canvas, Point, Polygon
+from bp_designs.core.geometry import Canvas, Polygon
 from bp_designs.experiment.params import ParameterSpace
 from bp_designs.experiment.runner import ExperimentRunner
 from bp_designs.generators.branching.space_colonization import SpaceColonization
+from bp_designs.patterns.shape import PointPattern, ShapePattern
 
 
 def generate_pattern(params: dict):
@@ -16,7 +17,7 @@ def generate_pattern(params: dict):
     gen = SpaceColonization(**params)
     # Generate pattern using stored parameters
     network = gen.generate_pattern()
-    return network.to_geometry()
+    return network
 
 
 def main():
@@ -34,8 +35,8 @@ def main():
         ]
     )
     canvas = Canvas(coords=canvas_coords)
-    root_position = Point(x=int(width / 2), y=int(height), z=None)
-    boundary = Polygon(coords=canvas_coords)  # Same polygon for initial and final boundaries
+    root_position = PointPattern(x=int(width / 2), y=int(height), canvas=canvas)
+    boundary = ShapePattern(Polygon(coords=canvas_coords), canvas=canvas)
 
     # Define parameter space
     space = ParameterSpace(

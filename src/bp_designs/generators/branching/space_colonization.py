@@ -9,7 +9,7 @@ from shapely.geometry import Polygon as ShapelyPolygon
 
 from bp_designs.core.directions import DirectionVectors
 from bp_designs.core.generator import Generator
-from bp_designs.core.geometry import Canvas, Point, Polygon
+from bp_designs.core.geometry import Canvas, Point, Polygon, Polyline
 from bp_designs.core.pattern import Pattern
 from bp_designs.generators.branching.strategies import (
     AttractionStrategy,
@@ -39,7 +39,7 @@ class SpaceColonization(Generator):
     def __init__(
         self,
         canvas: Canvas,
-        root_position: Point | Pattern,
+        root_position: Pattern,
         initial_boundary: Pattern,
         final_boundary: Pattern,
         seed: int = 0,
@@ -89,24 +89,25 @@ class SpaceColonization(Generator):
         self.final_boundary_pattern = final_boundary
 
         # Resolve patterns to geometry using canvas
-        if isinstance(root_position, Pattern):
-            resolved_root = root_position.to_geometry(canvas)
-            if not isinstance(resolved_root, Point):
-                raise ValueError(f"root_position pattern must resolve to Point, got {type(resolved_root)}")
-            self.root_position_array = np.array([resolved_root.x, resolved_root.y], dtype=float)
-        else:
-            self.root_position_array = np.array([root_position.x, root_position.y], dtype=float)
+        resolved_root = root_position.to_geometry(canvas)
+        if not isinstance(resolved_root, Point):
+            raise ValueError(f"root_position must resolve to Point, got {type(resolved_root)}")
+        self.root_position_array = np.array([resolved_root.x, resolved_root.y], dtype=float)
 
         # Resolve boundaries to polygons
         initial_geom = initial_boundary.to_geometry(canvas)
-        if hasattr(initial_geom, "polylines"):  # Polyline
+        if isinstance(initial_geom, Polyline):
             self.initial_boundary = Polygon(coords=initial_geom.polylines[0])
+        elif isinstance(initial_geom, Polygon):
+            self.initial_boundary = initial_geom
         else:
             raise ValueError(f"initial_boundary must resolve to Polyline/Polygon, got {type(initial_geom)}")
 
         final_geom = final_boundary.to_geometry(canvas)
-        if hasattr(final_geom, "polylines"):  # Polyline
+        if isinstance(final_geom, Polyline):
             self.final_boundary = Polygon(coords=final_geom.polylines[0])
+        elif isinstance(final_geom, Polygon):
+            self.final_boundary = final_geom
         else:
             raise ValueError(f"final_boundary must resolve to Polyline/Polygon, got {type(final_geom)}")
         self.max_iterations = max_iterations

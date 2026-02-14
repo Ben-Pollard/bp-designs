@@ -289,7 +289,13 @@ class ObstacleAvoidanceGrowth(GrowthStrategy):
         self.num_samples = num_samples
         self.max_angle = max_angle
         # Pre-convert to shapely for performance
-        self.shapely_obstacles = [ShapelyPolygon(p.coords) for p in obstacles]
+        self.shapely_obstacles = []
+        for p in obstacles:
+            if hasattr(p, "coords"):
+                self.shapely_obstacles.append(ShapelyPolygon(p.coords))
+            elif hasattr(p, "polylines"):
+                # Use the first polyline as the boundary
+                self.shapely_obstacles.append(ShapelyPolygon(p.polylines[0]))
 
     def refine_vectors(
         self,

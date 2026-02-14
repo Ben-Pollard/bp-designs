@@ -2,9 +2,10 @@
 
 import numpy as np
 
-from bp_designs.core.geometry import Canvas, Point
+from bp_designs.core.geometry import Canvas
 from bp_designs.generators.branching.space_colonization import SpaceColonization
 from bp_designs.generators.primitives.two_d import Oval
+from bp_designs.patterns.shape import PointPattern
 
 
 class TestSpaceColonization:
@@ -15,7 +16,7 @@ class TestSpaceColonization:
         # Create a simple canvas (100x100 square)
         self.canvas = Canvas(coords=np.array([[0, 0], [100, 0], [100, 100], [0, 100]]))
         # Root position at center
-        self.root_position = Point(x=50, y=50, z=None)
+        self.root_position = PointPattern(x=50, y=50, canvas=self.canvas)
         # Initial and final boundaries (same for simplicity)
         self.initial_boundary = Oval.from_width_height(50, 50).generate_pattern()
         self.final_boundary = Oval.from_width_height(70, 70).generate_pattern()
@@ -252,7 +253,7 @@ class TestSpaceColonization:
         initial_boundary = Oval.from_width_height(50, 50, canvas=self.canvas).generate_pattern()
 
         # Root at center (50, 50) is inside a 40x40 oval centered at (50, 50)
-        root_pos = Point(50, 50, 0)
+        root_pos = PointPattern(50, 50, canvas=self.canvas)
 
         generator = SpaceColonization(
             canvas=self.canvas,
