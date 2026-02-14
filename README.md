@@ -2,6 +2,8 @@
 
 ![4 Trees Composition](assets/4trees.jpg)
 
+![Gallery Refinement Experiment](assets/gallery.png)
+
 Generative system for creating natural, algorithmic patterns for physical fabrication.
 
 **Core Philosophy:** Deterministic algorithms → organic emergence → physical craft
