@@ -13,6 +13,7 @@ from bp_designs.core.scene import Scene
 from bp_designs.generators.branching import strategies
 from bp_designs.generators.branching.space_colonization import SpaceColonization
 from bp_designs.generators.primitives.two_d import Oval, Rectangle
+from bp_designs.patterns.network import distribution
 from bp_designs.patterns.network.refinement import NetworkRefinementStrategy
 from bp_designs.patterns.network.renderer import NetworkStyle
 from bp_designs.patterns.organs import BlossomGenerator, LeafGenerator
@@ -34,7 +35,9 @@ if __name__ == "__main__":
         shadow_amount=0.05
     )
 
-    global_canvas = Canvas.from_width_height(width=2100, height=2970)
+    global_width = 2100
+    global_height = 2970
+    global_canvas = Canvas.from_width_height(width=global_width, height=global_height)
     scene = Scene(global_canvas, render_params={"lighting": lighting})
 
     scene.add_layer(
@@ -60,7 +63,8 @@ if __name__ == "__main__":
     unique_params = [
         {
             'cell': (0, 0), #top left
-            'final_boundary': partial(lambda local_canvas: Oval.from_width_height(width=0.85, height=0.85, canvas=local_canvas).generate_pattern()),
+            # 'final_boundary': partial(lambda local_canvas: Oval.from_width_height(width=0.85, height=0.85, canvas=local_canvas).generate_pattern()),
+            'final_boundary': partial(lambda local_canvas: Oval.from_bbox([0.1, 0.1, 0.9, 0.75], canvas=local_canvas).generate_pattern()),
             'organ': leaf_gen.generate_pattern(base_color=Color.from_hex("#075F3F"), scale=70.0),
             'growth_strategy': strategies.MomentumGrowth(segment_length=4, momentum=0.68),
             'attraction_strategy': None,
@@ -74,8 +78,9 @@ if __name__ == "__main__":
         },
                 {
             'cell': (0, 1), #top right
-            'final_boundary': partial(lambda local_canvas: Oval.from_width_height(width=0.85, height=0.85, canvas=local_canvas).generate_pattern()),
-            'growth_strategy': strategies.GridSnappedGrowth(segment_length=8, angles=4),
+            # 'final_boundary': partial(lambda local_canvas: Oval.from_width_height(width=0.85, height=0.85, canvas=local_canvas).generate_pattern()),
+            'final_boundary': partial(lambda local_canvas: Oval.from_bbox([0.1, 0.1, 0.9, 0.75], canvas=local_canvas).generate_pattern()),
+            'growth_strategy': strategies.GridSnappedGrowth(segment_length=20, angles=4),
             'attraction_strategy': None,
             'topology_strategy': None,
             'refinement_strategy': NetworkRefinementStrategy(
@@ -99,7 +104,8 @@ if __name__ == "__main__":
 
         {
             'cell': (1, 0), #bottom left
-            'final_boundary': partial(lambda local_canvas: Oval.from_width_height(width=0.85, height=0.85, canvas=local_canvas).generate_pattern()),
+            # 'final_boundary': partial(lambda local_canvas: Oval.from_width_height(width=0.85, height=0.85, canvas=local_canvas).generate_pattern()),
+            'final_boundary': partial(lambda local_canvas: Oval.from_bbox([0.1, 0.1, 0.9, 0.75], canvas=local_canvas).generate_pattern()),
             'growth_strategy': strategies.ObstacleAvoidanceGrowth(obstacles=[Oval.from_width_height(0.25, 0.25)]),
             # 'attraction_strategy': strategies.DriftAttraction(drift_vector=np.array([1,1])),
             'topology_strategy': None,
@@ -123,10 +129,11 @@ if __name__ == "__main__":
         },
         {
             'cell': (1, 1), #bottom right
-            'final_boundary': partial(lambda local_canvas: Oval.from_width_height(width=0.75, height=0.75, canvas=local_canvas).generate_pattern()),
+            # 'final_boundary': partial(lambda local_canvas: Oval.from_width_height(width=0.75, height=0.75, canvas=local_canvas).generate_pattern()),
+            'final_boundary': partial(lambda local_canvas: Oval.from_bbox([0.1, 0.1, 0.9, 0.75], canvas=local_canvas).generate_pattern()),
             'organ': leaf_gen.generate_pattern(base_color=Color.from_hex("#F49F0A"), scale=70.0),
             'growth_strategy': None,
-            'attraction_strategy': strategies.VortexAttraction(center=np.array([0.5,0.5]), strength=10),
+            'attraction_strategy': strategies.VortexAttraction(center=np.array([0.45,0.45]), strength=10),
             'topology_strategy': None,
             'refinement_strategy': NetworkRefinementStrategy(
                 decimate_min_distance=5,
@@ -143,8 +150,8 @@ if __name__ == "__main__":
         organ = p['organ']
 
         # Local scene using sub_canvas for placement
-        cell_size = 1000
-        cell_x_size = 1000
+        x_border = 20
+        cell_x_size = (global_width - 4*30) / 2
         cell_y_size = 1200
         num_cols, num_rows = 2, 2
         h_gap = (global_canvas.width - num_cols * cell_x_size) / (num_cols + 1)
@@ -163,7 +170,8 @@ if __name__ == "__main__":
         # Create generator
         gen = SpaceColonization(
             canvas=local_canvas,
-            root_position=PointPattern(0.5, 0.5, is_relative=True),
+            # root_position=PointPattern(0.5, 0.5, is_relative=True),
+            root_position=PointPattern(0.5, 0.97, is_relative=True),
             initial_boundary=p['final_boundary'](local_canvas),
             final_boundary=p['final_boundary'](local_canvas),
             num_attractions=50,
@@ -174,21 +182,21 @@ if __name__ == "__main__":
             refinement_strategy=p.get('refinement_strategy'),
             growth_strategy=p['growth_strategy'],
             attraction_strategy=p.get('attraction_strategy'),
-            topology_strategy=p['topology_strategy']
-            # organ_template=organ,
-            # organ_distribution="terminal"
+            topology_strategy=p['topology_strategy'],
+            organ_template=p['organ'],
+            organ_distribution=distribution.ClusterDistribution(count=5, random_chance=0.4, min_depth_ratio=0.25)
         )
 
         # Generate tree pattern
         network_style = NetworkStyle(
-            distribution_params={"min_depth_ratio": 0.33, "random_chance": 0.5},
-            render_mode="polyline",
+            distribution_params={"min_depth_ratio": 0.33, "random_chance": 0.25},
+            render_mode="clipped_skin",
             taper_style="smooth",
             shading="linear",
             color_strategy="depth",
             thickness_mode="descendant", #hierarchy
             taper_power=0.5,
-            max_thickness=cell_size / 20,
+            max_thickness=cell_x_size / 20,
             min_thickness=1,
             start_color="#1F1E1E",
             end_color="#717171"
@@ -213,7 +221,7 @@ if __name__ == "__main__":
             f"border_{i}_{j}",
             rect_gen.generate_pattern(),
             stroke_color="#1B1B1B",
-            stroke_width=cell_size / 50,
+            stroke_width=cell_x_size / 50,
             fill="none"
         )
 
@@ -225,7 +233,7 @@ if __name__ == "__main__":
 
     output_dir = Path("output/composition")
     output_dir.mkdir(parents=True, exist_ok=True)
-    svg_path = output_dir / "circular_grid" / "grid4.svg"
+    svg_path = output_dir / "circular_grid" / "grid8.svg"
     svg_string = scene.to_svg()
     svg_path.write_text(svg_string)
     print(f"Saved composition to {svg_path}")

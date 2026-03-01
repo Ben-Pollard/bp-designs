@@ -84,7 +84,11 @@ class DirectionalLighting(LightingModel):
         g_type = geometry_info.get("type", "background")
 
         if g_type == "branch" and "vector" in geometry_info:
-            return self._get_branch_fill(color_obj, geometry_info["vector"])
+            return self._get_branch_fill(
+                color_obj,
+                geometry_info["vector"],
+                start_pos=geometry_info.get("start_pos")
+            )
         elif g_type == "organ":
             return self._get_organ_fill(color_obj, geometry_info)
         elif g_type == "background":
@@ -94,8 +98,11 @@ class DirectionalLighting(LightingModel):
         else:
             return str(color_obj)
 
-    def _get_branch_fill(self, color: Color, segment_v: np.ndarray) -> str:
-        """Create a cylindrical gradient perpendicular to the branch segment."""
+    def _get_branch_fill(self, color: Color, segment_v: np.ndarray, start_pos: np.ndarray | None = None) -> str:
+        """Create a cylindrical gradient perpendicular to the branch segment.
+
+        If start_pos is provided, uses userSpaceOnUse for seamless shading across joints.
+        """
         if not hasattr(self, "_context"):
             return str(color)
 
@@ -115,22 +122,42 @@ class DirectionalLighting(LightingModel):
         bias_str = f"{bias:.2f}".replace("-", "n")
         grad_id = f"branch_grad_{self._session_id}_{color.to_hex().replace('#', '')}_{bias_str}"
 
+        # If using userSpaceOnUse, we need a unique ID per segment position too
+        if start_pos is not None:
+            pos_str = f"{start_pos[0]:.1f}_{start_pos[1]:.1f}".replace(".", "_").replace("-", "n")
+            grad_id += f"_{pos_str}"
+
         if grad_id not in self._gradient_cache:
             # Create highlight and shadow colors
             highlight = color.lighten(self.highlight_amount)
             shadow = color.darken(self.shadow_amount)
 
-            # Define gradient direction based on normal and bias
-            # We want the highlight on the side facing the light
-            x1, y1 = 0.5 - normal[0] * 0.5, 0.5 - normal[1] * 0.5
-            x2, y2 = 0.5 + normal[0] * 0.5, 0.5 + normal[1] * 0.5
+            if start_pos is not None:
+                # userSpaceOnUse: Define gradient in global coordinates
+                # We want the gradient to span the width of the branch (roughly)
+                # but more importantly, to be consistent across segments.
+                # We'll use a fixed width for the gradient transition to ensure continuity.
+                grad_width = 20.0 # Arbitrary scale for the transition
+                x1, y1 = start_pos - normal * (grad_width / 2)
+                x2, y2 = start_pos + normal * (grad_width / 2)
 
-            grad = self._context.dwg.linearGradient(
-                id=grad_id,
-                start=(f"{x1*100:.1f}%", f"{y1*100:.1f}%"),
-                end=(f"{x2*100:.1f}%", f"{y2*100:.1f}%"),
-                gradientUnits="objectBoundingBox",
-            )
+                grad = self._context.dwg.linearGradient(
+                    id=grad_id,
+                    start=(float(x1), float(y1)),
+                    end=(float(x2), float(y2)),
+                    gradientUnits="userSpaceOnUse",
+                )
+            else:
+                # objectBoundingBox: Define gradient relative to shape
+                x1, y1 = 0.5 - normal[0] * 0.5, 0.5 - normal[1] * 0.5
+                x2, y2 = 0.5 + normal[0] * 0.5, 0.5 + normal[1] * 0.5
+
+                grad = self._context.dwg.linearGradient(
+                    id=grad_id,
+                    start=(f"{x1*100:.1f}%", f"{y1*100:.1f}%"),
+                    end=(f"{x2*100:.1f}%", f"{y2*100:.1f}%"),
+                    gradientUnits="objectBoundingBox",
+                )
 
             # Add stops: Shadow -> Base -> Highlight (or vice versa based on bias)
             if bias > 0:

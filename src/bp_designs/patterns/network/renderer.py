@@ -220,6 +220,72 @@ class NetworkRenderer:
                             **svg_attrs,
                         )
                     )
+            elif style.render_mode == "clipped_skin":
+                # 1. Create the unioned polygon skin
+                polygons = self.to_polygon(
+                    thickness=style.thickness,
+                    min_thickness=style.min_thickness,
+                    max_thickness=style.max_thickness,
+                    taper_power=style.taper_power,
+                    thickness_mode=style.thickness_mode,
+                )
+
+                if polygons:
+                    # 2. Define the clipPath
+                    import uuid
+                    clip_id = f"skin_clip_{uuid.uuid4().hex[:8]}"
+                    clip_path = context.dwg.clipPath(id=clip_id)
+                    for poly in polygons:
+                        clip_path.add(
+                            context.dwg.polygon(
+                                points=[(float(x), float(y)) for x, y in poly.coords]
+                            )
+                        )
+                    context.dwg.defs.add(clip_path)
+
+                    # 3. Render trapezoids inside a clipped group
+                    context.push_group("clipped_trapezoids", clip_path=f"url(#{clip_id})")
+                    for i in range(len(self.network.node_ids)):
+                        node_color = all_colors[i]
+                        parent_id = self.network.parents[i]
+                        if parent_id == -1 or parent_id not in id_to_idx:
+                            continue
+                        parent_idx = id_to_idx[parent_id]
+                        start = self.network.positions[parent_idx]
+                        end = self.network.positions[i]
+                        t_start = all_thickness[parent_idx]
+                        t_end = all_thickness[i]
+
+                        v = end - start
+                        length = np.linalg.norm(v)
+                        if length > 0:
+                            n = np.array([-v[1], v[0]]) / length
+                            p1 = start + n * (t_start / 2)
+                            p2 = start - n * (t_start / 2)
+                            p3 = end - n * (t_end / 2)
+                            p4 = end + n * (t_end / 2)
+
+                            fill = node_color
+                            if context.lighting:
+                                # Use userSpaceOnUse for seamless shading
+                                fill = context.lighting.get_fill(
+                                    node_color,
+                                    {"type": "branch", "vector": v, "start_pos": start}
+                                )
+
+                            context.add(
+                                context.dwg.polygon(
+                                    points=[
+                                        (float(p1[0]), float(p1[1])),
+                                        (float(p2[0]), float(p2[1])),
+                                        (float(p3[0]), float(p3[1])),
+                                        (float(p4[0]), float(p4[1])),
+                                    ],
+                                    fill=str(fill),
+                                    **svg_attrs,
+                                )
+                            )
+                    context.pop_group()
             else:
                 for i in range(len(self.network.node_ids)):
                     node_color = all_colors[i]
