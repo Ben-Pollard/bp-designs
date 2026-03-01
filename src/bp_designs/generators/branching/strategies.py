@@ -381,8 +381,12 @@ class VortexAttraction(AttractionStrategy):
         if attractions.size == 0:
             return attractions
 
+        x_min, y_min, x_max, y_max = network.pattern_bounds
+        centre_x, centre_y = self.center
+        local_centre = np.array([x_min + centre_x * (x_max-x_min), y_min + centre_y * (y_max-y_min)])
+
         # Vector from center to points
-        diff = attractions - self.center
+        diff = attractions - local_centre
 
         # Perpendicular vector (rotate 90 deg)
         perp = np.column_stack([-diff[:, 1], diff[:, 0]])

@@ -9,5 +9,8 @@
     "editor.codeActionsOnSave": {
             "source.fixAll.ruff": "explicit",
             "source.organizeImports": "explicit"
-        }
+        },
+        "python-envs.defaultEnvManager": "ms-python.python:poetry",
+        "python-envs.defaultPackageManager": "ms-python.python:poetry",
+        "python-envs.pythonProjects": []
 }
