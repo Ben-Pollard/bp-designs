@@ -259,11 +259,18 @@ class NetworkRenderer:
                         v = end - start
                         length = np.linalg.norm(v)
                         if length > 0:
+                            # Slightly overlap segments to prevent millipede-like gaps
+                            # We extend the segment by a small fraction of its length at both ends
+                            overlap_factor = 0.05
+                            overlap_v = v * overlap_factor
+                            start_adj = start - overlap_v
+                            end_adj = end + overlap_v
+
                             n = np.array([-v[1], v[0]]) / length
-                            p1 = start + n * (t_start / 2)
-                            p2 = start - n * (t_start / 2)
-                            p3 = end - n * (t_end / 2)
-                            p4 = end + n * (t_end / 2)
+                            p1 = start_adj + n * (t_start / 2)
+                            p2 = start_adj - n * (t_start / 2)
+                            p3 = end_adj - n * (t_end / 2)
+                            p4 = end_adj + n * (t_end / 2)
 
                             fill = node_color
                             if context.lighting:

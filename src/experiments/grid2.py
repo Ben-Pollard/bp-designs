@@ -100,6 +100,7 @@ if __name__ == "__main__":
                 jitter=0.1,
                 overlap=1.2
             ),
+            'organ_distribution': distribution.RhythmicDistribution(interval=5, random_chance=0.8, min_depth_ratio=0.25)
         },
 
         {
@@ -184,7 +185,8 @@ if __name__ == "__main__":
             attraction_strategy=p.get('attraction_strategy'),
             topology_strategy=p['topology_strategy'],
             organ_template=p['organ'],
-            organ_distribution=distribution.ClusterDistribution(count=5, random_chance=0.4, min_depth_ratio=0.25)
+            # organ_distribution=distribution.ClusterDistribution(count=5, random_chance=0.4, min_depth_ratio=0.25)
+            organ_distribution=distribution.RhythmicDistribution(interval=15, random_chance=0.8, min_depth_ratio=0.25) if not p.get('organ_distribution') else p['organ_distribution']
         )
 
         # Generate tree pattern
@@ -233,7 +235,7 @@ if __name__ == "__main__":
 
     output_dir = Path("output/composition")
     output_dir.mkdir(parents=True, exist_ok=True)
-    svg_path = output_dir / "circular_grid" / "grid8.svg"
+    svg_path = output_dir / "circular_grid" / "grid9.svg"
     svg_string = scene.to_svg()
     svg_path.write_text(svg_string)
     print(f"Saved composition to {svg_path}")
