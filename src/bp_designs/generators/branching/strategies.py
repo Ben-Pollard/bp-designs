@@ -11,6 +11,7 @@ from shapely.geometry import Polygon as ShapelyPolygon
 
 if TYPE_CHECKING:
     from bp_designs.core.directions import DirectionVectors
+    from bp_designs.core.field import Field
     from bp_designs.core.geometry import Polygon
     from bp_designs.patterns.network import BranchNetwork
 
@@ -397,3 +398,50 @@ class VortexAttraction(AttractionStrategy):
             perp_norm = np.where(norms[:, None] > 0, perp / norms[:, None], 0.0)
 
         return attractions + perp_norm * self.strength
+
+
+class FieldInfluenceGrowth(GrowthStrategy):
+    """Growth strategy that blends attraction vectors with a vector field."""
+
+    def __init__(self, field: Field, weight: float = 0.5, segment_length: float = 2.0):
+        """Initialize field influence growth.
+
+        Args:
+            field: The vector field to influence growth
+            weight: Weight of the field influence (0.0 to 1.0)
+            segment_length: Length of each growth segment
+        """
+        self.field = field
+        self.weight = weight
+        self.segment_length = segment_length
+
+    def refine_vectors(
+        self,
+        growth_vectors: DirectionVectors,
+        network: BranchNetwork,
+        growth_node_indices: np.ndarray,
+    ) -> np.ndarray:
+        if growth_node_indices.size == 0:
+            return np.zeros((0, 2))
+
+        # Get raw attraction directions (normalized)
+        attraction_dirs = growth_vectors.directions[growth_node_indices]
+
+        # Get field vectors at current node positions
+        node_positions = network.positions[growth_node_indices]
+        field_vectors = self.field(node_positions)
+
+        # Normalize field vectors
+        f_norms = np.linalg.norm(field_vectors, axis=1, keepdims=True)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            field_dirs = np.where(f_norms > 0, field_vectors / f_norms, 0.0)
+
+        # Blend directions
+        blended = (1.0 - self.weight) * attraction_dirs + self.weight * field_dirs
+
+        # Re-normalize blended directions
+        b_norms = np.linalg.norm(blended, axis=1, keepdims=True)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            refined_dirs = np.where(b_norms > 0, blended / b_norms, 0.0)
+
+        return refined_dirs * self.segment_length
