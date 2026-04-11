@@ -71,9 +71,10 @@
 
 
 ### Phase 4: Additional Pattern Families
-- Flow fields (directional texture)
-- Reaction-diffusion (organic fill)
-- Parametric curves (geometric motifs)
+- [x] Flow fields (directional texture)
+- [x] Flow field alignment completed: vectorized NoiseField, dynamic termination, rendering strategies
+- [ ] Reaction-diffusion (organic fill)
+- [ ] Parametric curves (geometric motifs)
 - Each implements Pattern interface → immediately composable
 
 ### Phase 5: Pattern Evaluation Framework

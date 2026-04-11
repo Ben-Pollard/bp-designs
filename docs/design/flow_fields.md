@@ -20,7 +20,12 @@ Fields may be defined by mathematical functions, including:
 
 - **Trigonometric fields** — produce regular, wave-like directional patterns
 - **Radial fields** — emanate from one or more focal points
-- **Noise-derived fields** — produce organic, continuously varying flow. Perlin noise, simplex noise, and curl noise are primary tools. Curl noise is a notable variant that produces divergence-free fields (no sources or sinks), which tend to yield especially fluid, naturalistic streamlines.
+- **Noise-derived fields** — produce organic, continuously varying flow. The system supports multiple noise "engines," each with a distinct spatial character:
+    - **Simplex Noise**: Smooth, isotropic, and organic. The standard for naturalistic flow.
+    - **Worley (Cellular) Noise**: Sharp and crystalline. Produces "shattered" patterns with sudden directional pivots at cell boundaries.
+    - **Value Noise**: Blobby and pillowy. Lacks the directional "intent" of gradient noise, resulting in more rounded, soft structures.
+    - **Sine Wave (Plasma)**: Rhythmic and interference-like. Sums multiple waves to create wood-grain or topographical textures.
+    - **Wavelet Noise**: Clean and band-limited. Provides precise control over feature scale without stray high-frequency jitters.
 
 The parameters of a noise function — scale, octaves, persistence, lacunarity — become parameters of the field itself, controlling feature size, fine detail, and overall turbulence.
 
@@ -30,7 +35,15 @@ Field magnitude (the strength of the vector at each point) is separable from dir
 
 ### Field Composition
 
-Multiple fields may be combined to produce results of greater complexity and variety than any single function could achieve. Composition modes include additive blending, multiplicative blending, and masking. This allows complex visual territories to be constructed — for example, a calm radial field in one region and turbulent noise in another, with a smooth transition between them.
+Multiple fields may be combined to produce results of greater complexity and variety than any single function could achieve. Composition modes include additive blending, multiplicative blending, and masking.
+
+A particularly powerful pattern is **Base + Noise** composition. By adding a structured "base" field (like a constant direction or a vortex) to a noise field, you can achieve a "joined up" aesthetic where streamlines share a global intent while retaining organic local variation.
+
+- **Linear + Noise**: `ConstantField` + `NoiseField`. Produces parallel-ish flows that meander together.
+- **Radial + Noise**: `RadialField` + `NoiseField`. Produces an organic "explosion" or "implosion" effect.
+- **Vortex + Noise**: `VortexField` + `NoiseField`. Produces turbulent, swirling patterns that maintain a circular momentum.
+
+The "Signal-to-Noise Ratio" (the relative strength of the base field vs. the noise) is a key expressive parameter. High signal results in structured, technical-looking flows; high noise results in chaotic, painterly textures.
 
 ### Field Domain and Boundaries
 
@@ -155,6 +168,18 @@ Restricting where streamlines are seeded or rendered to particular regions, shap
 Positions in the canvas that concentrate visual interest may emerge naturally from field definition (e.g. sinks, sources, saddle points in the field) or be imposed compositionally by biasing seeding density toward particular regions.
 
 ---
+
+## Expressive Parameters
+
+### Line Length and Smoothing
+
+The relationship between **Line Length** (integration steps) and **Smoothing** (simplification threshold) is a primary driver of the pattern's "hand-drawn" vs. "digital" character.
+
+- **Line Length**: Longer streamlines reveal more of the field's global structure but can lead to visual clutter if not balanced with density.
+- **Smoothing (Epsilon)**: We use the Ramer-Douglas-Peucker (RDP) algorithm to simplify polylines.
+    - `epsilon = 0.0`: Raw integration steps. Can feel "jittery" or overly detailed.
+    - `epsilon = 0.5 - 2.0`: Organic smoothing. Removes micro-jitters while retaining the flow's character.
+    - `epsilon > 5.0`: Geometric abstraction. Turns curves into sharp, angular paths, which can be a powerful aesthetic choice for physical fabrication (e.g., CNC or plotter work).
 
 ## Open Decisions
 

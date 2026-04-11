@@ -143,54 +143,116 @@ class PoissonDiscSeeding(SeedingStrategy):
 
 class TerminationStrategy(ABC):
     """Abstract base class for termination strategies."""
+
     @abstractmethod
-    def should_terminate(self, positions: np.ndarray, step_count: int) -> bool:
-        """Check if integration should stop.
-        
+    def should_terminate(self, positions: np.ndarray, step_count: int, ids: np.ndarray | None = None) -> np.ndarray:
+        """Check which positions should stop.
+
         Args:
             positions: (N, 2) array of current positions.
             step_count: Number of steps taken so far.
+            ids: (N,) array of streamline IDs for the positions.
+
+        Returns:
+            (N,) boolean array where True means terminate.
         """
         pass
 
+    def update(self, positions: np.ndarray, ids: np.ndarray | None = None) -> None:
+        """Optional: Update internal state with new positions.
+
+        Args:
+            positions: (N, 2) array of new positions to incorporate.
+            ids: (N,) array of streamline IDs for the positions.
+        """
+        pass
+
+
 class FixedLengthTermination(TerminationStrategy):
     """Stop after a fixed number of steps."""
+
     def __init__(self, max_steps: int = 100):
         self.max_steps = max_steps
 
-    def should_terminate(self, positions: np.ndarray, step_count: int) -> bool:
-        return step_count >= self.max_steps
+    def should_terminate(self, positions: np.ndarray, step_count: int, ids: np.ndarray | None = None) -> np.ndarray:
+        terminate = step_count >= self.max_steps
+        return np.full(len(positions), terminate, dtype=bool)
+
 
 class BoundaryTermination(TerminationStrategy):
     """Stop when leaving a boundary."""
+
     def __init__(self, boundary: Polygon):
         from shapely.geometry import Polygon as ShapelyPolygon
+
         self.boundary = boundary
         self.shapely_poly = ShapelyPolygon(boundary.coords)
 
-    def should_terminate(self, positions: np.ndarray, step_count: int) -> bool:
-        # For vectorized use, we might need to handle multiple points.
-        # But for now, let's assume it's called per streamline or we check if ANY/ALL left.
-        # The plan says "Stops when leaving a Polygon".
-        # If positions is (N, 2), we check if they are all outside?
-        # Or return a mask? The ABC says bool.
+    def should_terminate(self, positions: np.ndarray, step_count: int, ids: np.ndarray | None = None) -> np.ndarray:
+        from shapely import vectorized
 
-        # Let's assume it's for a single streamline point (the current head).
-        # We'll use shapely for the check.
-        from shapely.geometry import Point as ShapelyPoint
-        for p in positions:
-            if not self.shapely_poly.contains(ShapelyPoint(p[0], p[1])):
-                return True
-        return False
+        # vectorized.contains returns a boolean array for (N, 2) positions
+        # We want to terminate if NOT contained
+        is_inside = vectorized.contains(self.shapely_poly, positions[:, 0], positions[:, 1])
+        return ~is_inside
+
 
 class ProximityTermination(TerminationStrategy):
     """Stop when too close to existing points."""
-    def __init__(self, existing_points: np.ndarray, min_dist: float = 1.0):
+
+    def __init__(self, existing_points: np.ndarray, min_dist: float = 1.0, existing_ids: np.ndarray | None = None):
         from scipy.spatial import cKDTree
-        self.tree = cKDTree(existing_points)
+
+        self.points = existing_points
+        self.ids = existing_ids if existing_ids is not None else np.full(len(existing_points), -1, dtype=int)
+        self.tree = cKDTree(self.points) if len(self.points) > 0 else None
         self.min_dist = min_dist
 
-    def should_terminate(self, positions: np.ndarray, step_count: int) -> bool:
-        # Check if any position is within min_dist of existing points
-        dists, _ = self.tree.query(positions, k=1)
-        return np.any(dists < self.min_dist)
+    def should_terminate(self, positions: np.ndarray, step_count: int, ids: np.ndarray | None = None) -> np.ndarray:
+        # If no points yet, nothing to collide with
+        if self.tree is None:
+            return np.zeros(len(positions), dtype=bool)
+
+        # Query for multiple neighbors to find potential collisions with OTHER streamlines
+        # We query for k=10 to be safe, but we'll filter by ID.
+        k = min(10, len(self.points))
+        dists, indices = self.tree.query(positions, k=k)
+
+        # Handle case where k=1 (query returns 1D arrays)
+        if k == 1:
+            dists = dists[:, np.newaxis]
+            indices = indices[:, np.newaxis]
+
+        terminate = np.zeros(len(positions), dtype=bool)
+
+        if ids is None:
+            # Fallback to simple proximity if no IDs provided
+            return dists[:, 0] < self.min_dist
+
+        for i in range(len(positions)):
+            my_id = ids[i]
+            # Check neighbors for this position
+            for d, idx in zip(dists[i], indices[i]):
+                if d >= self.min_dist:
+                    break # Neighbors are sorted by distance
+
+                neighbor_id = self.ids[idx]
+                if neighbor_id != my_id:
+                    terminate[i] = True
+                    break
+
+        return terminate
+
+    def update(self, positions: np.ndarray, ids: np.ndarray | None = None) -> None:
+        """Add new points to the spatial index."""
+        from scipy.spatial import cKDTree
+
+        if len(positions) == 0:
+            return
+
+        self.points = np.concatenate([self.points, positions], axis=0)
+
+        new_ids = ids if ids is not None else np.full(len(positions), -1, dtype=int)
+        self.ids = np.concatenate([self.ids, new_ids], axis=0)
+
+        self.tree = cKDTree(self.points)

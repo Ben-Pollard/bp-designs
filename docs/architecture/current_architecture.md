@@ -48,13 +48,13 @@ graph TD
 - **Location:** [`src/bp_designs/core/generator.py`](src/bp_designs/core/generator.py)
 - **Role:** Encapsulates deterministic algorithms.
 - **Implementation:** Abstract base class `Generator` with a `generate_pattern()` method.
-- **Key Examples:** `SpaceColonization`, `VoronoiGenerator`.
+- **Key Examples:** `SpaceColonization`, `VoronoiGenerator`, `FlowGenerator`.
 
 ### 1.2 Pattern (Semantic Layer)
 - **Location:** [`src/bp_designs/core/pattern.py`](src/bp_designs/core/pattern.py)
 - **Role:** Represents the *meaning* of the generated data (e.g., a branching hierarchy, a cellular tessellation).
 - **Implementation:** Abstract base class `Pattern`. It holds `render_params` and a reference to a `Canvas`.
-- **Key Examples:** `BranchNetwork`, `OrganPattern`, `Scene`.
+- **Key Examples:** `BranchNetwork`, `OrganPattern`, `Scene`, `StreamlinePattern`.
 - **Alignment:** High. By preserving semantics (like parent-child relationships in trees), the system allows for sophisticated post-processing (like tapering based on descendant count) that would be impossible with raw geometry.
 
 ### 1.3 Geometry (Interchange Layer)
@@ -101,7 +101,13 @@ sequenceDiagram
     - `guide()`: Uses one pattern's field to influence another's growth.
     - `texture()`: Fills a skeleton with a texture pattern.
     - `nest()`: Generates patterns within regions defined by another pattern.
-    - `blend()`: Arithmetic blending of fields.
+    - `blend()`: Arithmetic blending of fields (Implemented in `Field` core).
+
+### 2.3 Vector Field Abstraction
+- **Location:** [`src/bp_designs/core/field.py`](src/bp_designs/core/field.py)
+- **Role:** Provides a resolution-independent mapping from space to vectors.
+- **Composition:** Supports operator overloading (`+`, `-`, `*`) for complex field construction.
+- **Integration:** Used by `FlowGenerator` for streamlines and `FieldInfluenceGrowth` for branching patterns.
 
 ---
 
