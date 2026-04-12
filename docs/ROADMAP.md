@@ -73,6 +73,12 @@
 ### Phase 4: Additional Pattern Families
 - [x] Flow fields (directional texture)
 - [x] Flow field alignment completed: vectorized NoiseField, dynamic termination, rendering strategies
+- [x] Advanced Flow Field features:
+  - [x] Field composition (Base + Noise)
+  - [x] Multiple noise engines (Worley, Value, Sine, Wavelet)
+  - [x] Palette mapping (Angle, Position, Start Position, Magnitude)
+  - [x] RDP-based smoothing and abstraction
+  - [x] Classic (Sequential) Flow Generator for high-fidelity streamlines
 - [ ] Reaction-diffusion (organic fill)
 - [ ] Parametric curves (geometric motifs)
 - Each implements Pattern interface → immediately composable

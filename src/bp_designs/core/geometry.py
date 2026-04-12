@@ -62,6 +62,24 @@ class Polygon(Geometry):
         xmax, ymax = self.coords.max(axis=0)
         return (float(xmin), float(ymin), float(xmax), float(ymax))
 
+    def contains(self, point: np.ndarray) -> bool:
+        """Check if a point is inside the polygon using ray casting."""
+        x, y = point
+        n = len(self.coords)
+        inside = False
+        p1x, p1y = self.coords[0]
+        for i in range(n + 1):
+            p2x, p2y = self.coords[i % n]
+            if y > min(p1y, p2y):
+                if y <= max(p1y, p2y):
+                    if x <= max(p1x, p2x):
+                        if p1y != p2y:
+                            xints = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
+                        if p1x == p2x or x <= xints:
+                            inside = not inside
+            p1x, p1y = p2x, p2y
+        return inside
+
 
 @dataclass
 class Canvas(Polygon):

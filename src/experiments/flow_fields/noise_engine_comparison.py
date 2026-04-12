@@ -11,9 +11,9 @@ from bp_designs.core.field import (
 from bp_designs.core.geometry import Canvas
 from bp_designs.experiment.params import ParameterSpace
 from bp_designs.experiment.runner import ExperimentRunner
-from bp_designs.generators.flow.generator import FlowConfig, FlowGenerator
+from bp_designs.generators.flow.classic import ClassicFlowGenerator
+from bp_designs.generators.flow.generator import FlowConfig
 from bp_designs.generators.flow.strategies import (
-    FixedLengthTermination,
     GridSeeding,
     RK4Integrator,
 )
@@ -43,52 +43,47 @@ def generator_fn(params):
         noise = NoiseField(seed=42)
 
     # 2. Compose with a base flow to see how it "organicizes" structure
-    base_flow = ConstantField(np.array([1.0, 0.0])) # Right
+    base_flow = ConstantField(np.array([1.0, 0.0]))  # Right
     f = base_flow + noise * params["noise_weight"]
 
     # 3. Configuration
-    config = FlowConfig(
-        dt=0.5,
-        max_steps=200,
-        min_dist=1.0,
-        seed_dist=15.0
-    )
+    config = FlowConfig(dt=0.2, max_steps=params["max_steps"], min_dist=1.0, seed_dist=15.0)
 
     # 4. Strategies
     bounds = np.array([[10.0, 10.0], [190.0, 190.0]])
     seeding = GridSeeding(bounds=bounds, resolution=(12, 12))
     integrator = RK4Integrator()
-    termination = FixedLengthTermination(max_steps=config.max_steps)
 
-    gen = FlowGenerator(
+    gen = ClassicFlowGenerator(
         canvas=canvas,
         field=f,
         seeding_strategy=seeding,
         integration_strategy=integrator,
-        termination_strategy=termination,
-        config=config
+        config=config,
+        trace_both_ways=True,
     )
 
     # 5. Styling
     style = FlowStyle(
-        color_strategy=AngleColor(),
-        width_strategy=TaperedWidth(min_width=0.2, max_width=1.5),
-        epsilon=0.5
+        color_strategy=AngleColor(), width_strategy=TaperedWidth(min_width=0.2, max_width=1.5), epsilon=0.5
     )
 
     return gen.generate_pattern(style=style)
+
 
 def run_engine_comparison():
     space = ParameterSpace(
         name="noise_engine_comparison",
         specs={
             "engine": ["simplex", "worley", "value", "sine", "wavelet"],
-            "noise_weight": [0.3, 0.7] # Low vs High perturbation
-        }
+            "noise_weight": [0.4, 0.8],  # Low vs High perturbation
+            "max_steps": [1000],  # LONG lines to see field structure
+        },
     )
 
     runner = ExperimentRunner("noise_engine_comparison", svg_width=200, svg_height=200)
     runner.run(space.to_grid(), generator_fn, parallel=True)
+
 
 if __name__ == "__main__":
     run_engine_comparison()

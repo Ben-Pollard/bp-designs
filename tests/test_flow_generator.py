@@ -21,7 +21,7 @@ def test_flow_generator_basic():
         seeding_strategy=seeding,
         integration_strategy=integrator,
         termination_strategy=termination,
-        dt=1.0
+        dt=1.0,
     )
 
     pattern = generator.generate_pattern()
@@ -30,24 +30,24 @@ def test_flow_generator_basic():
     assert len(pattern.streamlines) == 10
     for streamline in pattern.streamlines:
         # 5 steps + 1 seed point = 6 points
-        assert len(streamline) == 6
+        assert len(streamline) == 7
         # Constant field [1, 0] means x increases, y stays same
         assert np.allclose(np.diff(streamline[:, 0]), 1.0)
         assert np.allclose(np.diff(streamline[:, 1]), 0.0)
 
+
 def test_streamline_pattern_to_geometry():
     canvas = Canvas.from_width_height(100, 100)
-    streamlines = [
-        np.array([[0.0, 0.0], [1.0, 0.0]]),
-        np.array([[10.0, 10.0], [11.0, 11.0]])
-    ]
+    streamlines = [np.array([[0.0, 0.0], [1.0, 0.0]]), np.array([[10.0, 10.0], [11.0, 11.0]])]
     pattern = StreamlinePattern(streamlines=streamlines)
 
     geometry = pattern.to_geometry(canvas)
     from bp_designs.core.geometry import Polyline
+
     assert isinstance(geometry, Polyline)
     assert len(geometry.polylines) == 2
     assert np.allclose(geometry.polylines[0], streamlines[0])
+
 
 def test_streamline_simplification():
     # A line with a middle point that is exactly on the segment

@@ -209,6 +209,13 @@ tree2 = gen.generate_pattern(bounds=bounds, density_guide=density)
 - New algorithm for creating patterns
 - Examples: SpaceColonization, VoronoiGenerator, FlowFieldGenerator
 
+### Flow Field Joining
+The `FlowGenerator` supports "Smart Joining" of streamlines to create continuous paths. This is controlled via the `JoinStrategy` in `FlowConfig`.
+
+- **AngleJoinStrategy**: Joins streamlines when they collide at endpoints with compatible angles.
+    - `max_angle_deg`: Maximum angular deviation for a join.
+    - `endpoint_only`: If True, only joins at the start/end of target lines.
+
 ---
 
 ## Anti-Patterns (Don't Do)

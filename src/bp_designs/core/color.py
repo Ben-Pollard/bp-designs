@@ -9,8 +9,10 @@ import colorsys
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 if TYPE_CHECKING:
-    import numpy as np
+    pass
 
 
 @dataclass(frozen=True)
@@ -41,7 +43,6 @@ class Color:
         """Create Color from RGB integers (0-255)."""
         return cls(r / 255.0, g / 255.0, b / 255.0, a)
 
-    @classmethod
     @classmethod
     def from_hsl(cls, h: float, s: float, lightness: float, a: float = 1.0) -> Color:
         """Create Color from HSL (0-1)."""
@@ -140,8 +141,6 @@ class Color:
 
     def jitter(self, amount: float, rng: np.random.Generator | None = None) -> Color:
         """Return a color with random variation in RGB components."""
-        import numpy as np
-
         if rng is None:
             rng = np.random.default_rng()
         v = rng.uniform(-amount, amount, 3)
@@ -184,3 +183,92 @@ class Palette:
 
     def __iter__(self):
         return iter(self.colors)
+
+    def lerp_at(self, t: float) -> Color:
+        """Interpolate between colors in the palette at position t (0-1)."""
+        if not self.colors:
+            return Color(0, 0, 0)
+        if len(self.colors) == 1:
+            return self.colors[0]
+
+        t = np.clip(t, 0.0, 1.0)
+        # Map t to the segments between colors
+        scaled_t = t * (len(self.colors) - 1)
+        idx = int(scaled_t)
+        if idx >= len(self.colors) - 1:
+            return self.colors[-1]
+
+        segment_t = scaled_t - idx
+        return Color.lerp(self.colors[idx], self.colors[idx + 1], segment_t)
+
+    def get_at(self, t: float) -> Color:
+        """Return the nearest color in the palette at position t (0-1) without interpolation."""
+        if not self.colors:
+            return Color(0, 0, 0)
+        t = np.clip(t, 0.0, 1.0)
+        idx = int(round(t * (len(self.colors) - 1)))
+        return self.colors[idx]
+
+    @classmethod
+    def analogous(cls, base: Color, n: int = 5, spread: float = 0.1) -> Palette:
+        """Create an analogous palette (colors next to each other on the wheel)."""
+        h, s, l = base.to_hsl()
+        colors = []
+        for i in range(n):
+            offset = (i / max(1, n - 1) - 0.5) * spread
+            colors.append(Color.from_hsl((h + offset) % 1.0, s, l, base.a))
+        return cls(colors, name=f"Analogous {base.to_hex()}")
+
+    @classmethod
+    def triadic(cls, base: Color) -> Palette:
+        """Create a triadic palette (three colors equally spaced)."""
+        h, s, l = base.to_hsl()
+        colors = [
+            base,
+            Color.from_hsl((h + 1 / 3) % 1.0, s, l, base.a),
+            Color.from_hsl((h + 2 / 3) % 1.0, s, l, base.a),
+        ]
+        return cls(colors, name=f"Triadic {base.to_hex()}")
+
+
+class MasterPalettes:
+    """Curated aesthetic palettes for generative patterns."""
+
+    MOSS_AND_STONE = Palette(
+        [
+            Color.from_hex("#2d3e2d"),  # Deep Forest
+            Color.from_hex("#4a5d4a"),  # Moss
+            Color.from_hex("#7a8a7a"),  # Slate
+            Color.from_hex("#a8b5a8"),  # Lichen
+            Color.from_hex("#d1d9d1"),  # Mist
+        ],
+        name="Moss & Stone",
+    )
+
+    UKIYO_E = Palette(
+        [
+            Color.from_hex("#2a4d69"),  # Indigo
+            Color.from_hex("#4b86b4"),  # Sky
+            Color.from_hex("#adcbe3"),  # Cloud
+            Color.from_hex("#e7eff6"),  # Paper
+            Color.from_hex("#ee6e73"),  # Terracotta
+        ],
+        name="Ukiyo-e",
+    )
+
+    BOTANICAL = Palette(
+        [
+            Color.from_hex("#1a1a1a"),  # Ink
+            Color.from_hex("#4d4d4d"),  # Charcoal
+            Color.from_hex("#8c7b6c"),  # Earth
+            Color.from_hex("#d9c5b2"),  # Aged Paper
+            Color.from_hex("#f2e8df"),  # Parchment
+        ],
+        name="Botanical Etching",
+    )
+
+    @classmethod
+    def get(cls, name: str) -> Palette:
+        """Get a master palette by name (case-insensitive)."""
+        name = name.upper().replace(" ", "_")
+        return getattr(cls, name, cls.MOSS_AND_STONE)

@@ -10,28 +10,23 @@ from bp_designs.generators.flow.strategies import (
     GridSeeding,
     RK4Integrator,
 )
-from bp_designs.patterns.flow import (
-    AngleColor,
-    FlowStyle,
-    TaperedWidth,
-)
+from bp_designs.patterns.flow import ConstantWidth, FlowStyle, PaletteMapColor, TaperedWidth
 
 
 def generator_fn(params):
     canvas = Canvas.from_width_height(200, 200)
 
     # 1. Field: Base Flow + Noise
-    # We use a consistent field to isolate the effects of length and smoothing
     base_field = ConstantField(np.array([1.0, 0.0]))  # Right
-    noise_field = NoiseField(seed=42, scale=40.0, strength=0.4)
+    noise_field = NoiseField(seed=42, scale=50.0, strength=0.5)
     f = base_field + noise_field
 
     # 2. Configuration
-    config = FlowConfig(dt=params["dt"], max_steps=params["max_steps"], min_dist=1.0, seed_dist=20.0)
+    config = FlowConfig(dt=0.2, max_steps=500, min_dist=params["min_dist"], seed_dist=15.0)
 
     # 3. Strategies
     bounds = np.array([[10.0, 10.0], [190.0, 190.0]])
-    seeding = GridSeeding(bounds=bounds, resolution=(10, 10))
+    seeding = GridSeeding(bounds=bounds, resolution=(15, 15))
     integrator = RK4Integrator()
 
     gen = ClassicFlowGenerator(
@@ -43,29 +38,39 @@ def generator_fn(params):
         trace_both_ways=True,
     )
 
-    # 4. Styling (Smoothing via epsilon)
-    style = FlowStyle(
-        color_strategy=AngleColor(),
-        width_strategy=TaperedWidth(min_width=0.2, max_width=1.5),
-        epsilon=params["epsilon"],
+    # 4. Styling: Bold vs Organic
+    color_strategy = PaletteMapColor(
+        palette="UKIYO_E",
+        property="angle",
+        interpolate=params["interpolate"],
+        per_segment=params["per_segment"],
     )
+
+    if params["width_mode"] == "constant":
+        width_strategy = ConstantWidth(width=params["max_width"])
+    else:
+        width_strategy = TaperedWidth(min_width=0.2, max_width=params["max_width"])
+
+    style = FlowStyle(color_strategy=color_strategy, width_strategy=width_strategy, epsilon=0.5)
 
     return gen.generate_pattern(style=style)
 
 
-def run_smoothing_study():
+def run_bold_study():
     space = ParameterSpace(
-        name="flow_smoothing_study",
+        name="bold_flow_study",
         specs={
-            "dt": [0.1, 0.5, 1.0],  # Integration Step (Res)
-            "max_steps": [100, 400],  # Line Length
-            "epsilon": [0.0, 1.0, 5.0],  # Smoothing (RDP threshold)
+            "min_dist": [0.0, 1.5, 4.0],  # Spacing
+            "max_width": [1.0, 3.0, 6.0],  # Thickness
+            "width_mode": ["constant", "tapered"],
+            "interpolate": [True],
+            "per_segment": [True],
         },
     )
 
-    runner = ExperimentRunner("flow_smoothing_study", svg_width=200, svg_height=200)
+    runner = ExperimentRunner("bold_flow_study", svg_width=200, svg_height=200)
     runner.run(space.to_grid(), generator_fn, parallel=True)
 
 
 if __name__ == "__main__":
-    run_smoothing_study()
+    run_bold_study()

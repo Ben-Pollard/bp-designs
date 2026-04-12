@@ -143,6 +143,19 @@ Colour operates at three levels:
 
 Field angle is a particularly natural colour driver, mapping the full rotational range of the field to a colour wheel or gradient. Magnitude can drive brightness or saturation, separating the energy of the field from its directionality.
 
+### Palette Mapping
+
+To ensure aesthetic harmony, the system supports **Palette Mapping**. Instead of mapping field properties directly to raw color values (like the full 0-1 hue range), properties are mapped to a curated `Palette`.
+
+- **Angle Mapping**: Maps the 0-2π rotational range to the palette. This creates a "color field" that reinforces the flow's directionality while staying within a harmonious scheme.
+- **Position Mapping**: Maps the X or Y coordinate to the palette, creating a global gradient effect that "colors" the flow based on its location on the canvas.
+- **Magnitude Mapping**: Maps field strength to the palette, allowing more energetic regions to have distinct colors.
+
+The system includes several **Master Palettes** inspired by the project's design goals:
+- **Moss & Stone**: Deep greens and slates for an organic, forest-floor feel.
+- **Ukiyo-e**: Indigos and terracotta inspired by Japanese woodblock prints.
+- **Botanical Etching**: Inks and aged paper tones for a classic scientific illustration look.
+
 **Opacity** is treated as a close relative of colour. Variable opacity — per-streamline or along the curve — can produce layered, atmospheric effects, particularly when streamlines are allowed to overlap.
 
 ---

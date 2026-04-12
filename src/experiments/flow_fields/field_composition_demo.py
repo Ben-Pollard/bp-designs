@@ -4,9 +4,9 @@ from bp_designs.core.field import AngleField, ConstantField, NoiseField, RadialF
 from bp_designs.core.geometry import Canvas
 from bp_designs.experiment.params import ParameterSpace
 from bp_designs.experiment.runner import ExperimentRunner
-from bp_designs.generators.flow.generator import FlowConfig, FlowGenerator
+from bp_designs.generators.flow.classic import ClassicFlowGenerator
+from bp_designs.generators.flow.generator import FlowConfig
 from bp_designs.generators.flow.strategies import (
-    FixedLengthTermination,
     GridSeeding,
     RK4Integrator,
 )
@@ -24,7 +24,7 @@ def generator_fn(params):
     # 1. Select Base Field
     base_type = params["base_field"]
     if base_type == "constant":
-        base_field = ConstantField(np.array([1.0, 0.0])) # Right
+        base_field = ConstantField(np.array([1.0, 0.0]))  # Right
     elif base_type == "angle":
         base_field = AngleField(params["angle"], degrees=True)
     elif base_type == "radial":
@@ -41,12 +41,7 @@ def generator_fn(params):
     f = base_field + noise_field
 
     # 3. Configuration
-    config = FlowConfig(
-        dt=0.5,
-        max_steps=params["max_steps"],
-        min_dist=1.0,
-        seed_dist=params["grid_res"]
-    )
+    config = FlowConfig(dt=0.5, max_steps=params["max_steps"], min_dist=1.0, seed_dist=params["grid_res"])
 
     # 4. Strategies
     bounds = np.array([[10.0, 10.0], [190.0, 190.0]])
@@ -55,25 +50,23 @@ def generator_fn(params):
     seeding = GridSeeding(bounds=bounds, resolution=(res, res))
 
     integrator = RK4Integrator()
-    termination = FixedLengthTermination(max_steps=config.max_steps)
 
-    gen = FlowGenerator(
+    gen = ClassicFlowGenerator(
         canvas=canvas,
         field=f,
         seeding_strategy=seeding,
         integration_strategy=integrator,
-        termination_strategy=termination,
-        config=config
+        config=config,
+        trace_both_ways=True,
     )
 
     # 5. Styling
     style = FlowStyle(
-        color_strategy=AngleColor(),
-        width_strategy=TaperedWidth(min_width=0.2, max_width=1.5),
-        epsilon=0.5
+        color_strategy=AngleColor(), width_strategy=TaperedWidth(min_width=0.2, max_width=1.5), epsilon=0.5
     )
 
     return gen.generate_pattern(style=style)
+
 
 def run_composition_demo():
     space = ParameterSpace(
@@ -81,15 +74,16 @@ def run_composition_demo():
         specs={
             "base_field": ["constant", "angle", "radial", "vortex"],
             "angle": [45],
-            "noise_strength": [0.1, 0.3, 0.6], # Transition from "Joined Up" to "Chaotic"
+            "noise_strength": [0.1, 0.3, 0.6],  # Transition from "Joined Up" to "Chaotic"
             "noise_scale": [50],
             "grid_res": [15],
-            "max_steps": [200]
-        }
+            "max_steps": [200],
+        },
     )
 
     runner = ExperimentRunner("field_composition_demo", svg_width=200, svg_height=200)
     runner.run(space.to_grid(), generator_fn, parallel=True)
+
 
 if __name__ == "__main__":
     run_composition_demo()

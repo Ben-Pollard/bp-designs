@@ -11,6 +11,7 @@ from bp_designs.core.pattern import Pattern
 from bp_designs.core.renderer import RenderStyle
 
 if TYPE_CHECKING:
+    from bp_designs.core.color import Palette
     from bp_designs.core.renderer import RenderingContext
 
 
@@ -68,7 +69,9 @@ class AngleColor(ColorStrategy):
 
 
 class MagnitudeWidth(WidthStrategy):
-    def __init__(self, min_width: float = 0.5, max_width: float = 3.0, mag_range: tuple[float, float] = (0.0, 1.0)):
+    def __init__(
+        self, min_width: float = 0.5, max_width: float = 3.0, mag_range: tuple[float, float] = (0.0, 1.0)
+    ):
         self.min_width = min_width
         self.max_width = max_width
         self.mag_range = mag_range
@@ -84,7 +87,9 @@ class MagnitudeWidth(WidthStrategy):
 
 
 class MagnitudeColor(ColorStrategy):
-    def __init__(self, color1: str = "#0000ff", color2: str = "#ff0000", mag_range: tuple[float, float] = (0.0, 1.0)):
+    def __init__(
+        self, color1: str = "#0000ff", color2: str = "#ff0000", mag_range: tuple[float, float] = (0.0, 1.0)
+    ):
         self.color1 = color1
         self.color2 = color2
         self.mag_range = mag_range
@@ -101,6 +106,68 @@ class MagnitudeColor(ColorStrategy):
         c1 = Color.from_hex(self.color1)
         c2 = Color.from_hex(self.color2)
         return Color.lerp(c1, c2, t).to_hex()
+
+
+class PaletteMapColor(ColorStrategy):
+    """Maps a field property to a color from a palette."""
+
+    def __init__(
+        self,
+        palette: Palette | str,
+        property: str = "angle",
+        range: tuple[float, float] = (0.0, 1.0),
+        interpolate: bool = True,
+        per_segment: bool = True,
+    ):
+        if isinstance(palette, str):
+            from bp_designs.core.color import MasterPalettes
+
+            self.palette = MasterPalettes.get(palette)
+        else:
+            self.palette = palette
+        self.property = property
+        self.range = range
+        self.interpolate = interpolate
+        self.per_segment = per_segment
+
+    def get_color(self, streamline: np.ndarray, index: int, magnitudes: np.ndarray | None = None) -> str:
+        # If not per_segment, always use the first point/magnitude
+        eval_idx = index if self.per_segment else 0
+
+        if self.property == "angle":
+            # Angle is tricky for per_streamline: we use the first segment's angle
+            p1, p2 = streamline[eval_idx], streamline[eval_idx + 1]
+            v = p2 - p1
+            angle = np.arctan2(v[1], v[0])
+            t = (angle + np.pi) / (2 * np.pi)
+        elif self.property == "magnitude":
+            if magnitudes is None:
+                t = 0.5
+            else:
+                mag = magnitudes[eval_idx]
+                t = (mag - self.range[0]) / (self.range[1] - self.range[0])
+        elif self.property == "position_x":
+            t = (streamline[eval_idx, 0] - self.range[0]) / (self.range[1] - self.range[0])
+        elif self.property == "position_y":
+            t = (streamline[eval_idx, 1] - self.range[0]) / (self.range[1] - self.range[0])
+        elif self.property == "start_x":
+            t = (streamline[0, 0] - self.range[0]) / (self.range[1] - self.range[0])
+        elif self.property == "start_y":
+            t = (streamline[0, 1] - self.range[0]) / (self.range[1] - self.range[0])
+        elif self.property == "start_magnitude":
+            if magnitudes is None:
+                t = 0.5
+            else:
+                mag = magnitudes[0]
+                t = (mag - self.range[0]) / (self.range[1] - self.range[0])
+        else:
+            t = 0.5
+
+        t = np.clip(t, 0.0, 1.0)
+        if self.interpolate:
+            return self.palette.lerp_at(t).to_hex()
+        else:
+            return self.palette.get_at(t).to_hex()
 
 
 class FlowStyle(RenderStyle):
@@ -132,7 +199,7 @@ class StreamlinePattern(Pattern):
 
     def to_geometry(self, canvas: Canvas | None = None, epsilon: float | None = None) -> Geometry:
         """Convert streamlines to a Polyline geometry.
-        
+
         Args:
             canvas: Optional canvas for coordinate resolution.
             epsilon: Simplification threshold (RDP). 0.0 means no simplification.
@@ -163,7 +230,7 @@ class StreamlinePattern(Pattern):
         # If max distance is greater than epsilon, recursively simplify
         if dmax > epsilon:
             # Recursive call
-            rec_results1 = self._rdp(points[:index+1], epsilon)
+            rec_results1 = self._rdp(points[: index + 1], epsilon)
             rec_results2 = self._rdp(points[index:], epsilon)
 
             # Build the result list
