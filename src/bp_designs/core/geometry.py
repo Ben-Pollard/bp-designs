@@ -63,8 +63,18 @@ class Polygon(Geometry):
         return (float(xmin), float(ymin), float(xmax), float(ymax))
 
     def contains(self, point: np.ndarray) -> bool:
-        """Check if a point is inside the polygon using ray casting."""
+        """Check if a point is inside the polygon.
+
+        Optimized: uses bounding box check first, then ray casting.
+        """
         x, y = point
+        xmin, ymin, xmax, ymax = self.bounds()
+
+        # 1. Fast bounding box check
+        if x < xmin or x > xmax or y < ymin or y > ymax:
+            return False
+
+        # 2. Ray casting for complex polygons
         n = len(self.coords)
         inside = False
         p1x, p1y = self.coords[0]

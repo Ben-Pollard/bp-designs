@@ -12,8 +12,8 @@ class IntegrationStrategy(ABC):
     """Abstract base class for numerical integration strategies."""
 
     @abstractmethod
-    def step(self, field: Field, positions: np.ndarray, dt: float) -> np.ndarray:
-        """Calculate next positions for N particles.
+    def step(self, field: Field, positions: np.ndarray, dt: float) -> tuple[np.ndarray, np.ndarray]:
+        """Calculate next positions and return the field vectors at those positions.
 
         Args:
             field: The vector field to integrate.
@@ -21,7 +21,7 @@ class IntegrationStrategy(ABC):
             dt: Time step.
 
         Returns:
-            (N, 2) array of next positions.
+            Tuple of ((N, 2) next positions, (N, 2) field vectors).
         """
         pass
 
@@ -29,20 +29,21 @@ class IntegrationStrategy(ABC):
 class EulerIntegrator(IntegrationStrategy):
     """Simple Euler integration: pos + field(pos) * dt."""
 
-    def step(self, field: Field, positions: np.ndarray, dt: float) -> np.ndarray:
-        return positions + field(positions) * dt
+    def step(self, field: Field, positions: np.ndarray, dt: float) -> tuple[np.ndarray, np.ndarray]:
+        v = field(positions)
+        return positions + v * dt, v
 
 
 class RK4Integrator(IntegrationStrategy):
     """4th-order Runge-Kutta integration for better stability."""
 
-    def step(self, field: Field, positions: np.ndarray, dt: float) -> np.ndarray:
+    def step(self, field: Field, positions: np.ndarray, dt: float) -> tuple[np.ndarray, np.ndarray]:
         k1 = field(positions)
         k2 = field(positions + 0.5 * dt * k1)
         k3 = field(positions + 0.5 * dt * k2)
         k4 = field(positions + dt * k3)
 
-        return positions + (dt / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4)
+        return positions + (dt / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4), k1
 
 
 class SeedingStrategy(ABC):

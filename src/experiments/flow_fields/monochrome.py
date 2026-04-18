@@ -14,8 +14,8 @@ from bp_designs.core.field import (
 from bp_designs.core.geometry import Canvas
 from bp_designs.experiment.params import ParameterSpace
 from bp_designs.experiment.runner import ExperimentRunner
-from bp_designs.generators.flow.generator import FlowConfig, FlowGenerator
 from bp_designs.generators.flow.classic import ClassicFlowGenerator
+from bp_designs.generators.flow.generator import FlowConfig
 from bp_designs.generators.flow.strategies import (
     AngleJoinStrategy,
     CompositeTermination,

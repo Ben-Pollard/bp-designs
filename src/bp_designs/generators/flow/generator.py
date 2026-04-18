@@ -101,63 +101,24 @@ class FlowGenerator(Generator):
 
             self._execute_step(active, step, streamlines)
 
-        # 3. Finalize output
-        return self._finalize_pattern(streamlines, **kwargs)
+        # 3. Assemble pattern
+        final_streamlines = [s.points for s in streamlines.values()]
+        final_magnitudes = [s.magnitudes for s in streamlines.values()]
 
-    def _initialize_generation(self) -> dict[int, _Streamline]:
-        """Set up initial streamlines and spatial index."""
-        seeds = self.seeding_strategy.generate()
-        streamlines = {}
+        # Pass style to the pattern via render_params
+        from bp_designs.patterns.flow import FlowStyle
 
-        for i, pos in enumerate(seeds):
-            mag = self._get_magnitude(pos)
-            streamlines[i] = _Streamline(id=i, points=[pos], magnitudes=[mag])
+        render_params = {}
+        if isinstance(style, FlowStyle):
+            render_params = style.model_dump()
+        elif isinstance(style, dict):
+            render_params = style
 
-        # Initialize termination strategy with seed points
-        active_ids = np.array(list(streamlines.keys()))
-        self.termination_strategy.update(seeds, active_ids, np.zeros(len(seeds), dtype=int))
-
-        return streamlines
-
-    def _execute_step(self, active: list[_Streamline], step: int, all_streamlines: dict[int, _Streamline]):
-        """Perform a single integration step for all active streamlines."""
-        ids = np.array([s.id for s in active])
-        positions = np.array([s.last_pos for s in active])
-
-        # 1. Calculate next positions (with steering if enabled)
-        next_positions = self._get_steered_positions(positions, ids, all_streamlines)
-
-        # 2. Check for terminations (boundary, proximity)
-        terminate_mask = self.termination_strategy.should_terminate(next_positions, step, ids)
-
-        # 3. Handle collisions and potential joins
-        self._handle_collisions(active, next_positions, terminate_mask, all_streamlines)
-
-        # 4. Update spatial index for streamlines that are still active
-        still_active = [s for s in active if s.is_active]
-        if still_active:
-            new_pos = np.array([s.last_pos for s in still_active])
-            new_ids = np.array([s.id for s in still_active])
-            new_indices = np.array([len(s.points) - 1 for s in still_active])
-            self.termination_strategy.update(new_pos, new_ids, new_indices)
-
-    def _get_steered_positions(
-        self,
-        positions: np.ndarray,
-        ids: np.ndarray,
-        all_streamlines: dict[int, _Streamline],
-    ) -> np.ndarray:
-        """Calculate next positions, applying steering if configured."""
-        if self.config.steering_radius <= 0 or not hasattr(
-            self.termination_strategy, "get_steering_metadata"
-        ):
-            return self.integration_strategy.step(self.field, positions, self.dt)
-
-        field_vectors = self.field(positions)
-        steered_vectors = field_vectors.copy()
-
-        steering_metadata = self.termination_strategy.get_steering_metadata(
-            positions, self.config.steering_radius, ids
+        return StreamlinePattern(
+            streamlines=final_streamlines,
+            magnitudes=final_magnitudes,
+            canvas=self.canvas,
+            render_params=render_params,
         )
 
         for i, meta in enumerate(steering_metadata):
